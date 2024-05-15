@@ -12,7 +12,7 @@ fn main() {
     let m = 3;
 
     // Example competence matrix (binary)
-    let c = vec![
+    let c: Vec<Vec<i32>> = vec![
         vec![1, 0, 1], // Worker 0 can perform jobs 0 and 2
         vec![1, 1, 0], // Worker 1 can perform jobs 0 and 1
         vec![0, 1, 1], // Worker 2 can perform jobs 1 and 2
@@ -140,6 +140,13 @@ fn main() {
         ("d".to_string(), vec!("3", "5").iter().map(|x| x.to_string()).collect()),
         ("e".to_string(), vec!("4", "1", "2", "3").iter().map(|x| x.to_string()).collect())
     );
-    let _solution = calculate_static_assignment(&employees, &jobs, &competences);
+    let preferences = vec!(
+        ("a".to_string(), vec!("1").iter().map(|x| x.to_string()).collect()),
+        ("b".to_string(), vec!("2").iter().map(|x| x.to_string()).collect()),
+        ("c".to_string(), vec!("3", "4").iter().map(|x| x.to_string()).collect()),
+        ("d".to_string(), vec!("3").iter().map(|x| x.to_string()).collect()),
+        ("e".to_string(), vec!("4", "1").iter().map(|x| x.to_string()).collect())
+    );
+    let _solution = calculate_static_assignment(&employees, &jobs, &competences, &preferences);
 
 }
