@@ -3,5 +3,8 @@ pub use crate::core::structs::*;
 pub use crate::core::enums::*;
 pub use crate::core::anonymize::*;
 
-pub mod records;
-pub use crate::records::year_2023::*;
+// pub mod records;
+// pub use crate::records::year_2023::*;
+
+pub mod algorithms;
+pub use crate::algorithms::static_assignment::*;
