@@ -1,8 +1,38 @@
-# Artwork: Employee-job assignment problem
+# Artwork use-case: Employee-job assignment system
 
-The optimization model to assign \( N \) workers to \( M \) jobs, taking into account competences and preferences, is defined as follows:
+The problem is to assign $N$ workers to $M$ jobs, taking into account competences and preferences.
 
-## Notation
+## Quickstart
+1. Install Rust: https://www.rust-lang.org/tools/install
+2. Install Z3: https://github.com/Z3Prover/z3
+3. Clone this repository
+```
+git clone https://github.com/endre90/artwork_ejas.git
+```
+4. Build code:
+```
+cd artwork_ejas
+cargo build
+```
+5. Run an example, for instance:
+```
+TODO
+```
+## Background
+
+The remaining text shows the development steps of the EJAS for Artwork.
+1. Step 1: 
+   - Equal number of jobs and employees
+   - No planning horizon
+   - No history taken into account
+   - No fairness
+   - No external employees
+   - 
+
+## Step 1: Static assignment
+The static assignment assigns $N$ workers to $M$ jobs based on their competences and preferences to maximize overall satisfaction. Each worker has a list of competences (indicating which jobs they can perform) and a ranked list of job preferences. The procedure creates binary decision variables to indicate assignments, and it aims to maximize the total preference score while ensuring each worker is assigned to at most one job, each job is covered by at most one worker, and every job is covered by at least one worker that is competent to perform it. The goal is to find an optimal static assignment that respects workers' competences and maximizes their preferences.
+
+### Step 1: Notation
 
 - $N$: 
 Number of workers.
@@ -10,7 +40,7 @@ Number of workers.
 - $C_{ij}$: Binary competence matrix where $C_{ij} = 1$ if worker $i$ can perform job $j$, and $C_{ij} = 0$ otherwise.
 - $P_{ij}$: Preference rank matrix where $P_{ij}$ is the preference rank of job $j$ for worker $i$. Lower values in $P_{ij}$ indicate higher preference.
 
-## Decision Variables
+### Step 1: Decision Variables
 
 - $x_{ij}$: Binary decision variable such that:
 
@@ -22,7 +52,7 @@ x_{ij} =
 \end{cases}
 $$
 
-### Objective Function
+### Step 1: Objective Function
 
 Maximize the total preference score:
 
@@ -30,7 +60,7 @@ $$
 \text{Maximize} \quad \sum_{i=1}^{N} \sum_{j=1}^{M} (M - P_{ij}) \cdot x_{ij}
 $$
 
-### Constraints
+### Step 1: Constraints
 
 1. Each worker is assigned to at most one job:
 
@@ -50,32 +80,8 @@ $$
 x_{ij} \leq C_{ij} \quad \forall i, j
 $$
 
-4. Binary decision variables:
+4. Each job must be covered by at least one employee who is competent to perform it:
 
 $$
-x_{ij} \in \{0, 1\} \quad \forall i, j
-$$
-
-
-### Alternative constraints
-
-1. Each worker is assigned to at most one job:
-
-$$
-\sum_{j=1}^{M} x_{ij} \leq 1 \quad \forall i \in \{1, \ldots, N\}
-$$
-
-2. Combined constraint with implication: If worker \( i \) is assigned to job \( j \), then:
-   - No other worker \( k \) can be assigned to job \( j \) (for \( k \neq i \)).
-   - Worker \( i \) cannot be assigned to another job \( l \) (for \( l \neq j \)).
-   - Worker \( i \) must be competent to perform job \( j \).
-
-$$
-x_{ij} \implies \left( \bigwedge_{k \neq i} \neg x_{kj} \right) \land \left( \bigwedge_{l \neq j} \neg x_{il} \right) \land (x_{ij} \leq C_{ij}) \quad \forall i, j
-$$
-
-3. Binary decision variables:
-
-$$
-x_{ij} \in \{0, 1\} \quad \forall i, j
+\sum_{i=1}^{N} C_{ij} \geq 1 \quad \forall j \in \{1, \ldots, M\}
 $$

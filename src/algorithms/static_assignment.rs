@@ -136,6 +136,26 @@ pub fn calculate_static_assignment(
         }
     }
 
+    // Constraints: Each job must be covered by at least one competent worker
+    for j in 0..jobs.len() {
+        // let mut job_covered = Bool::from_bool(&ctx, false);
+        let mut should_be_covered = vec![];
+        for i in 0..employees.len() {
+            if c_matrix[i][j] {
+                should_be_covered.push(x[i][j].clone());
+            }
+        }
+        let job_covered = ast::Bool::or(
+            &ctx,
+            should_be_covered
+                .iter()
+                .map(|x| x)
+                .collect::<Vec<&ast::Bool>>()
+                .as_slice(),
+        );
+        optimizer.assert(&job_covered);
+    }
+
     // Objective: Maximize preferences
     let mut preference_score = Vec::new();
     for i in 0..employees.len() {
@@ -205,16 +225,46 @@ fn build_competence_matrix(
     let mut competence_matrix = vec![vec![false; job_list.len()]; competence_map.len()];
 
     // Fill the competence matrix
-    for (worker_index, (_, competences)) in competence_map.iter().enumerate() {
+    for (employee_index, (_, competences)) in competence_map.iter().enumerate() {
         for competence in competences {
             if let Some(&job_index) = job_index.get(competence) {
-                competence_matrix[worker_index][job_index] = true;
+                competence_matrix[employee_index][job_index] = true;
             }
         }
     }
 
     competence_matrix
 }
+
+// fn build_preference_matrix(
+//     preference_map: &Vec<(String, Vec<String>)>,
+//     competence_matrix: &Vec<Vec<bool>>,
+//     job_list: &Vec<String>,
+// ) -> Vec<Vec<usize>> {
+//     // Create a hashmap to map job names to their indices
+//     let job_index: HashMap<&String, usize> = job_list
+//         .iter()
+//         .enumerate()
+//         .map(|(i, job)| (job, i))
+//         .collect();
+
+//     // Initialize the preference matrix with default high values (e.g., job_list.len() which is worse than the worst preference)
+//     let mut preference_matrix =
+//         vec![vec![job_list.len() - 1; job_list.len()]; preference_map.len()];
+
+//     // Fill the preference matrix and filter out preferences for jobs that the worker is not competent to perform
+//     for (worker_index, (_, preferences)) in preference_map.iter().enumerate() {
+//         for (rank, job) in preferences.iter().enumerate() {
+//             if let Some(&job_idx) = job_index.get(job) {
+//                 if competence_matrix[worker_index][job_idx] {
+//                     preference_matrix[worker_index][job_idx] = rank;
+//                 }
+//             }
+//         }
+//     }
+
+//     preference_matrix
+// }
 
 fn build_preference_matrix(
     preference_map: &Vec<(String, Vec<String>)>,
@@ -232,10 +282,10 @@ fn build_preference_matrix(
         vec![vec![job_list.len() - 1; job_list.len()]; preference_map.len()];
 
     // Fill the preference matrix
-    for (worker_index, (_, preferences)) in preference_map.iter().enumerate() {
+    for (employee_index, (_, preferences)) in preference_map.iter().enumerate() {
         for (rank, job) in preferences.iter().enumerate() {
             if let Some(&job_idx) = job_index.get(job) {
-                preference_matrix[worker_index][job_idx] = rank;
+                preference_matrix[employee_index][job_idx] = rank;
             }
         }
     }
@@ -267,7 +317,7 @@ mod tests {
             ), // employee b can perform jobs 0 and 1
             (
                 "c".to_string(),
-                vec!["1", "2"].iter().map(|x| x.to_string()).collect(),
+                vec!["1"].iter().map(|x| x.to_string()).collect(),
             ), // employee c can perform jobs 1 and 2
         ];
 
@@ -289,6 +339,15 @@ mod tests {
         let s = calculate_static_assignment(false, &employees, &jobs, &competences, &preferences);
         println!("Optimal assignment: {:?}", s.0);
         println!("Total preference score: {}", s.1);
+        assert_eq!(
+            s.0,
+            [
+                ("a".to_string(), "2".to_string()),
+                ("b".to_string(), "0".to_string()),
+                ("c".to_string(), "1".to_string())
+            ]
+        );
+        assert_eq!(s.1, 4);
     }
 
     #[test]
