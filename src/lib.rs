@@ -8,4 +8,4 @@ pub use crate::core::enums::*;
 
 pub mod algorithms;
 pub use crate::algorithms::static_assignment::*;
-pub use crate::algorithms::flexible_assignment::*;
+pub use crate::algorithms::external_assignment::*;

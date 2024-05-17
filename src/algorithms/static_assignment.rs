@@ -145,14 +145,25 @@ pub fn calculate_static_assignment(
                 should_be_covered.push(x[i][j].clone());
             }
         }
-        let job_covered = ast::Bool::or(
+
+        let job_covered = ast::Bool::pb_eq(
             &ctx,
             should_be_covered
                 .iter()
-                .map(|x| x)
-                .collect::<Vec<&ast::Bool>>()
+                .map(|x| (x, 1))
+                .collect::<Vec<(&ast::Bool, i32)>>()
                 .as_slice(),
+            1,
         );
+
+        // let job_covered = ast::Bool::or(
+        //     &ctx,
+        //     should_be_covered
+        //         .iter()
+        //         .map(|x| x)
+        //         .collect::<Vec<&ast::Bool>>()
+        //         .as_slice(),
+        // );
         optimizer.assert(&job_covered);
     }
 
@@ -235,36 +246,6 @@ fn build_competence_matrix(
 
     competence_matrix
 }
-
-// fn build_preference_matrix(
-//     preference_map: &Vec<(String, Vec<String>)>,
-//     competence_matrix: &Vec<Vec<bool>>,
-//     job_list: &Vec<String>,
-// ) -> Vec<Vec<usize>> {
-//     // Create a hashmap to map job names to their indices
-//     let job_index: HashMap<&String, usize> = job_list
-//         .iter()
-//         .enumerate()
-//         .map(|(i, job)| (job, i))
-//         .collect();
-
-//     // Initialize the preference matrix with default high values (e.g., job_list.len() which is worse than the worst preference)
-//     let mut preference_matrix =
-//         vec![vec![job_list.len() - 1; job_list.len()]; preference_map.len()];
-
-//     // Fill the preference matrix and filter out preferences for jobs that the worker is not competent to perform
-//     for (worker_index, (_, preferences)) in preference_map.iter().enumerate() {
-//         for (rank, job) in preferences.iter().enumerate() {
-//             if let Some(&job_idx) = job_index.get(job) {
-//                 if competence_matrix[worker_index][job_idx] {
-//                     preference_matrix[worker_index][job_idx] = rank;
-//                 }
-//             }
-//         }
-//     }
-
-//     preference_matrix
-// }
 
 fn build_preference_matrix(
     preference_map: &Vec<(String, Vec<String>)>,
@@ -358,7 +339,7 @@ mod tests {
             Vec<(String, Vec<String>)>,
             Vec<(String, Vec<String>)>,
         ) {
-            let employees = vec!["Alice", "Bob", "Carol", "David", "Eve"]
+            let employees = vec!["Megan", "Bob", "Carol", "David", "Eve"]
                 .iter()
                 .map(|x| x.to_string())
                 .collect::<Vec<_>>();

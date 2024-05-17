@@ -114,13 +114,6 @@ pub fn calculate_flexible_assignment(
         optimizer.assert_soft(&at_most_one_job_per_employee, 1, None);
     }
 
-
-    // // Constraints: Each job is assigned to either one internal worker or one external worker
-    // for j in 0..jobs.len() {
-    //     let job_constraints: Vec<_> = (0..employees.len()).map(|i| x[i][j].clone()).collect();
-    //     optimizer.assert(&Bool::pb_eq(&ctx, &vec![e[j].clone()].into_iter().chain(job_constraints.into_iter()).collect::<Vec<_>>(), 1));
-    // }
-
     // Constraints: Each job is assigned to either one internal employee or one external employee
     for j in 0..jobs.len() {
         let job_constraints: Vec<_> = (0..employees.len()).map(|i| x[i][j].clone()).collect();
@@ -148,7 +141,7 @@ pub fn calculate_flexible_assignment(
         }
     }
 
-    // Constraints: Each job must be covered by at least one competent worker
+    // Constraints: Each job must be covered by one competent internal worker or an external worker
     for j in 0..jobs.len() {
         // let mut job_covered = Bool::from_bool(&ctx, false);
         let mut should_be_covered = vec![];
@@ -159,14 +152,16 @@ pub fn calculate_flexible_assignment(
         }
         should_be_covered.push(e[j].clone()); // Add the external worker option
 
-        let job_covered = ast::Bool::or(
+        let job_covered = ast::Bool::pb_eq(
             &ctx,
             should_be_covered
                 .iter()
-                .map(|x| x)
-                .collect::<Vec<&ast::Bool>>()
+                .map(|x| (x, 1))
+                .collect::<Vec<(&ast::Bool, i32)>>()
                 .as_slice(),
+            1,
         );
+
         optimizer.assert(&job_covered);
     }
 
@@ -301,20 +296,20 @@ mod tests {
     fn test_flexible_assignment() {
         // Number of employees and jobs
         let employees = vec!["a", "b", "c"].iter().map(|x| x.to_string()).collect();
-        let jobs = vec!["0", "1", "2"].iter().map(|x| x.to_string()).collect();
+        let jobs = vec!["0", "1", "2", "3", "4"].iter().map(|x| x.to_string()).collect();
 
         let competences = vec![
             (
                 "a".to_string(),
-                vec!["0"].iter().map(|x| x.to_string()).collect(),
+                vec!["0", "2"].iter().map(|x| x.to_string()).collect(),
             ), // employee a can perform jobs 0 and 2
             (
                 "b".to_string(),
-                vec!["0"].iter().map(|x| x.to_string()).collect(),
+                vec!["1"].iter().map(|x| x.to_string()).collect(),
             ), // employee b can perform jobs 0 and 1
             (
                 "c".to_string(),
-                vec!["0"].iter().map(|x| x.to_string()).collect(),
+                vec!["0", "1"].iter().map(|x| x.to_string()).collect(),
             ), // employee c can perform jobs 1 and 2
         ];
 
@@ -341,27 +336,31 @@ mod tests {
             s.0,
             [
                 ("a".to_string(), "2".to_string()),
-                ("b".to_string(), "0".to_string()),
-                ("c".to_string(), "1".to_string())
+                ("b".to_string(), "1".to_string()),
+                ("c".to_string(), "0".to_string())
             ]
         );
-        assert_eq!(s.2, 4);
+        assert_eq!(
+            s.1, [
+                "3".to_string(), "4".to_string()]
+        );
+        assert_eq!(s.2, 12);
     }
 
     #[test]
-    fn test_static_assignment_random() {
+    fn test_flexible_assignment_random() {
         fn generate_random_data() -> (
             Vec<String>,
             Vec<String>,
             Vec<(String, Vec<String>)>,
             Vec<(String, Vec<String>)>,
         ) {
-            let employees = vec!["Alice", "Bob", "Carol", "David", "Eve"]
+            let employees = vec!["Megan", "Bob", "Carol", "David", "Eve"]
                 .iter()
                 .map(|x| x.to_string())
                 .collect::<Vec<_>>();
 
-            let jobs = vec!["Job1", "Job2", "Job3", "Job4", "Job5"]
+            let jobs = vec!["Job1", "Job2", "Job3", "Job4", "Job5", "Job6"]
                 .iter()
                 .map(|x| x.to_string())
                 .collect::<Vec<_>>();
@@ -392,8 +391,9 @@ mod tests {
         }
 
         let r = generate_random_data();
-        let s = calculate_static_assignment(false, &r.0, &r.1, &r.2, &r.3);
+        let s = calculate_flexible_assignment(true, &r.0, &r.1, &r.2, &r.3);
         println!("Optimal assignment: {:?}", s.0);
-        println!("Total preference score: {}", s.1);
+        println!("External assignment: {:?}", s.1);
+        println!("Total preference score: {}", s.2);
     }
 }
