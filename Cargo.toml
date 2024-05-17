@@ -9,6 +9,7 @@ autotests = false
 z3 = { git = "https://github.com/endre90/z3.rs", branch = "master" }
 nanoid = "0.4.0"
 json = "0.12.4"
+rand = "0.8.5"
 
 [[bin]]
 name = "main"

@@ -1,7 +1,7 @@
 pub mod core;
 pub use crate::core::structs::*;
 pub use crate::core::enums::*;
-pub use crate::core::anonymize::*;
+// pub use crate::core::anonymize::*;
 
 // pub mod records;
 // pub use crate::records::year_2023::*;
