@@ -2,6 +2,26 @@
 
 The optimization model to assign \( N \) workers to \( M \) jobs, taking into account competences and preferences, is defined as follows:
 
+## Notation
+
+- $ N $: 
+Number of workers.
+- $ M $: Number of jobs.
+- $ C_{ij} $: Binary competence matrix where $ C_{ij} = 1 $ if worker $ i $ can perform job $ j $, and $ C_{ij} = 0 $ otherwise.
+- $ P_{ij} $: Preference rank matrix where $ P_{ij} $ is the preference rank of job $ j $ for worker $ i $. Lower values in $ P_{ij} $ indicate higher preference.
+
+## Decision Variables
+
+- $ x_{ij} $: Binary decision variable such that:
+
+$$
+x_{ij} =
+\begin{cases} 
+1 & \text{if worker } i \text{ is assigned to job } j \\ 
+0 & \text{otherwise} 
+\end{cases}
+$$
+
 ### Objective Function
 
 Maximize the total preference score:

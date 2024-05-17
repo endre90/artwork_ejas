@@ -59,20 +59,31 @@ pub fn calculate_static_assignment(
     let anon_competence_matrix = build_competence_matrix(&anon_competence_map, &anon_jobs);
     let competence_matrix = build_competence_matrix(competence_map, jobs);
 
-    // Just checking if it the anonymizatgion went as planned
+    // // Just checking if it the anonymizatgion went as planned
     // println!("employees: {:#?}", anon_employees_map);
     // println!("jobs: {:#?}", anon_jobs_map);
-    println!("competences: {:#?}", competence_map);
-    println!("anon_competences: {:#?}", anon_competence_map);
-    // println!("preferences: {:#?}", preference_map);
-    // println!("anon_preferences: {:#?}", anon_preferences);
-    println!("competence_matrix: {:#?}", competence_matrix);
-    println!("anon_competence_matrix: {:#?}", anon_competence_matrix); // check this might not be correct...
+    // // println!("competences: {:#?}", competence_map);
+    // println!("anon_competences: {:#?}", anon_competence_map);
+    // // println!("preferences: {:#?}", preference_map);
+    // // println!("anon_preferences: {:#?}", anon_preferences);
+    // // println!("competence_matrix: {:#?}", competence_matrix);
+    // println!("anon_competence_matrix: {:#?}", anon_competence_matrix);
 
     // Create the Z3 context and optimizer
     let cfg = Config::new();
     let ctx = Context::new(&cfg);
     let optimize = Optimize::new(&ctx);
+
+    // Create boolean variables for assignments
+    let x: Vec<Vec<Bool>> = (0..employees.len())
+        .map(|i| {
+            (0..jobs.len())
+                .map(|j| Bool::new_const(&ctx, format!("x_{}_{}", i, j)))
+                .collect()
+        })
+        .collect();
+
+
 
     // Check if a solution exists and return the satisfiable assignments
     let solution = optimize.check(&[]);

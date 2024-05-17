@@ -21,7 +21,7 @@ fn main() {
     // Example preferences list
     let p = vec![
         vec![2, 0, 1], // Worker 0 prefers job 2, then 0, then 1
-        vec![0, 1, 2], // Worker 1 prefers job 0, then 1, then 2
+        vec![2, 1, 0], // Worker 1 prefers job 2, then 1, then 2
         vec![1, 2, 0], // Worker 2 prefers job 1, then 2, then 0
     ];
 
