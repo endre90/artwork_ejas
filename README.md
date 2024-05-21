@@ -167,23 +167,23 @@ This model ensures that employees are fairly rotated through their highly prefer
 - $P_{ij}$: Preference rank matrix where $P_{ij}$ is the preference rank of job $j$ for worker $i$. Lower values in $P_{ij}$ indicate higher preference.
 - $x_{ijt}$: Binary decision variable such that:
 
-  $$
-  x_{ijt} =
-  \begin{cases} 
-  1 & \text{if worker } i \text{ is assigned to job } j \text{ at time } t \\ 
-  0 & \text{otherwise} 
-  \end{cases}
-  $$
+$$
+x_{ijt} =
+\begin{cases} 
+1 & \text{if worker } i \text{ is assigned to job } j \text{ at time } t \\ 
+0 & \text{otherwise} 
+\end{cases}
+$$
 
 - $e_{jt}$: Binary decision variable such that:
 
-  $$
-  e_{jt} =
-  \begin{cases} 
-  1 & \text{if an external employee is assigned to job } j \text{ at time } t \\ 
-  0 & \text{otherwise} 
-  \end{cases}
-  $$
+$$
+e_{jt} =
+\begin{cases} 
+1 & \text{if an external employee is assigned to job } j \text{ at time } t \\ 
+0 & \text{otherwise} 
+\end{cases}
+$$
 
 - $k$: Heuristic parameter representing the percentage of top preferred jobs to consider (1 to 100).
 - $\lambda$: Penalty factor for using external employees.
@@ -231,7 +231,7 @@ $$
    - TODO: Determine a good value for $k$.
 
 $$
-\Gamma = \beta \sum_{i=1}^{N} \left \vert \sum_{j=1}^{M} \sum_{t=1}^{T} \left( P_{ij} \leq \sigma \right) \cdot x_{ijt} - \frac{T \cdot \sigma}{N} \right\vert, \quad \sigma=\left\lfloor \frac{k \cdot M}{100} \right\rfloor
+\Gamma = \beta \sum_{i=1}^{N} \left \vert \sum_{j=1}^{M} \sum_{t=1}^{T} \left( P_{ij} \leq \sigma \right) \cdot x_{ijt} - \frac{T \cdot \sigma}{N} \right \vert, \quad \sigma=\left\lfloor \frac{k \cdot M}{100} \right\rfloor
 $$
 
 4. $\Delta$ - Fairness Term 2: Minimization of Least Preferred Jobs:
