@@ -101,7 +101,7 @@ pub fn calculate_flexible_assignment(
     // Constraints: Each employee is assigned at most one job
     for i in 0..employees.len() {
         let employee_constraints: Vec<_> = (0..jobs.len()).map(|j| x[i][j].clone()).collect();
-        let at_most_one_job_per_employee = ast::Bool::pb_eq(
+        let at_most_one_job_per_employee = ast::Bool::pb_le(
             &ctx,
             employee_constraints
                 .iter()
@@ -110,8 +110,8 @@ pub fn calculate_flexible_assignment(
                 .as_slice(),
             1,
         );
-        // preferred but not required to be satisfied (i.e. at most one job but it could be none)
-        optimizer.assert_soft(&at_most_one_job_per_employee, 1, None);
+
+        optimizer.assert(&at_most_one_job_per_employee);
     }
 
     // Constraints: Each job is assigned to either one internal employee or one external employee
@@ -119,29 +119,30 @@ pub fn calculate_flexible_assignment(
         let job_constraints: Vec<_> = (0..employees.len()).map(|i| x[i][j].clone()).collect();
         let at_most_one_employee_per_job = ast::Bool::pb_eq(
             &ctx,
-            vec![e[j].clone()].into_iter().chain(job_constraints.into_iter()).collect::<Vec<_>>()
+            vec![e[j].clone()]
+                .into_iter()
+                .chain(job_constraints.into_iter())
+                .collect::<Vec<_>>()
                 .iter()
                 .map(|x| (x, 1))
                 .collect::<Vec<(&ast::Bool, i32)>>()
                 .as_slice(),
             1,
         );
-        // preferred but not required to be satisfied (i.e. at most one employee but it could be none)
-        optimizer.assert_soft(&at_most_one_employee_per_job, 1, None);
+
+        optimizer.assert(&at_most_one_employee_per_job);
     }
 
     // Constraints: Only assign jobs that employees are competent to perform
     for i in 0..employees.len() {
         for j in 0..jobs.len() {
-            optimizer.assert_soft(
-                &Bool::implies(&x[i][j], &Bool::from_bool(&ctx, c_matrix[i][j])),
-                1,
-                None,
+            optimizer.assert(
+                &Bool::implies(&x[i][j], &Bool::from_bool(&ctx, c_matrix[i][j]))
             );
         }
     }
 
-    // Constraints: Each job must be covered by one competent internal worker or an external worker
+    // Constraints: Each job must be covered by at least one competent internal worker or an external worker
     for j in 0..jobs.len() {
         // let mut job_covered = Bool::from_bool(&ctx, false);
         let mut should_be_covered = vec![];
@@ -152,7 +153,7 @@ pub fn calculate_flexible_assignment(
         }
         should_be_covered.push(e[j].clone()); // Add the external worker option
 
-        let job_covered = ast::Bool::pb_eq(
+        let job_covered = ast::Bool::pb_ge(
             &ctx,
             should_be_covered
                 .iter()
@@ -185,11 +186,14 @@ pub fn calculate_flexible_assignment(
         .collect();
 
     // Penalty for using external employees
-    let penalty: Int = e.iter()
+    let penalty: Int = e
+        .iter()
         .map(|e_j| e_j.ite(&Int::from_i64(&ctx, 1), &Int::from_i64(&ctx, 0)))
         .fold(Int::from_i64(&ctx, 0), |acc, x| acc + x);
 
-    optimizer.maximize(&(&Int::add(&ctx, &preference_score_sum) - &(penalty * Int::from_i64(&ctx, 100))));
+    optimizer.maximize(
+        &(&Int::add(&ctx, &preference_score_sum) - &(penalty * Int::from_i64(&ctx, 100))),
+    );
 
     // Check satisfiability and print the solution
     match optimizer.check(&[]) {
@@ -293,10 +297,13 @@ mod tests {
     use rand::thread_rng;
 
     #[test]
-    fn test_flexible_assignment() {
+    fn test_external_assignment() {
         // Number of employees and jobs
         let employees = vec!["a", "b", "c"].iter().map(|x| x.to_string()).collect();
-        let jobs = vec!["0", "1", "2", "3", "4"].iter().map(|x| x.to_string()).collect();
+        let jobs = vec!["0", "1", "2", "3", "4"]
+            .iter()
+            .map(|x| x.to_string())
+            .collect();
 
         let competences = vec![
             (
@@ -340,15 +347,12 @@ mod tests {
                 ("c".to_string(), "0".to_string())
             ]
         );
-        assert_eq!(
-            s.1, [
-                "3".to_string(), "4".to_string()]
-        );
+        assert_eq!(s.1, ["3".to_string(), "4".to_string()]);
         assert_eq!(s.2, 12);
     }
 
     #[test]
-    fn test_flexible_assignment_random() {
+    fn test_external_assignment_random() {
         fn generate_random_data() -> (
             Vec<String>,
             Vec<String>,
@@ -360,7 +364,7 @@ mod tests {
                 .map(|x| x.to_string())
                 .collect::<Vec<_>>();
 
-            let jobs = vec!["Job1", "Job2", "Job3", "Job4", "Job5", "Job6"]
+            let jobs = vec!["Job1", "Job2", "Job3", "Job4", "Job5"]
                 .iter()
                 .map(|x| x.to_string())
                 .collect::<Vec<_>>();
@@ -391,7 +395,7 @@ mod tests {
         }
 
         let r = generate_random_data();
-        let s = calculate_flexible_assignment(true, &r.0, &r.1, &r.2, &r.3);
+        let s = calculate_flexible_assignment(false, &r.0, &r.1, &r.2, &r.3);
         println!("Optimal assignment: {:?}", s.0);
         println!("External assignment: {:?}", s.1);
         println!("Total preference score: {}", s.2);

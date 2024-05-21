@@ -96,7 +96,7 @@ pub fn calculate_static_assignment(
     // Constraints: Each employee is assigned at most one job
     for i in 0..employees.len() {
         let employee_constraints: Vec<_> = (0..jobs.len()).map(|j| x[i][j].clone()).collect();
-        let at_most_one_job_per_employee = ast::Bool::pb_eq(
+        let at_most_one_job_per_employee = ast::Bool::pb_le(
             &ctx,
             employee_constraints
                 .iter()
@@ -105,14 +105,14 @@ pub fn calculate_static_assignment(
                 .as_slice(),
             1,
         );
-        // preferred but not required to be satisfied (i.e. at most one job but it could be none)
-        optimizer.assert_soft(&at_most_one_job_per_employee, 1, None);
+
+        optimizer.assert(&at_most_one_job_per_employee);
     }
 
-    // Constraints: Each job is assigned to at most one employee
+    // Constraints: Each job is assigned to exactly one employee
     for j in 0..jobs.len() {
         let job_constraints: Vec<_> = (0..employees.len()).map(|i| x[i][j].clone()).collect();
-        let at_most_one_employee_per_job = ast::Bool::pb_eq(
+        let exactly_one_employee_per_job = ast::Bool::pb_eq(
             &ctx,
             job_constraints
                 .iter()
@@ -121,24 +121,22 @@ pub fn calculate_static_assignment(
                 .as_slice(),
             1,
         );
-        // preferred but not required to be satisfied (i.e. at most one employee but it could be none)
-        optimizer.assert_soft(&at_most_one_employee_per_job, 1, None);
+
+        optimizer.assert(&exactly_one_employee_per_job);
     }
 
-    // Constraints: Only assign jobs that employees are competent to perform
+    // Constraints: Only assign jobs to employees are competent to perform them
     for i in 0..employees.len() {
         for j in 0..jobs.len() {
-            optimizer.assert_soft(
-                &Bool::implies(&x[i][j], &Bool::from_bool(&ctx, c_matrix[i][j])),
-                1,
-                None,
-            );
+            optimizer.assert(&Bool::implies(
+                &x[i][j],
+                &Bool::from_bool(&ctx, c_matrix[i][j]),
+            ));
         }
     }
 
     // Constraints: Each job must be covered by at least one competent worker
     for j in 0..jobs.len() {
-        // let mut job_covered = Bool::from_bool(&ctx, false);
         let mut should_be_covered = vec![];
         for i in 0..employees.len() {
             if c_matrix[i][j] {
@@ -146,7 +144,7 @@ pub fn calculate_static_assignment(
             }
         }
 
-        let job_covered = ast::Bool::pb_eq(
+        let job_covered = ast::Bool::pb_ge(
             &ctx,
             should_be_covered
                 .iter()
@@ -156,14 +154,6 @@ pub fn calculate_static_assignment(
             1,
         );
 
-        // let job_covered = ast::Bool::or(
-        //     &ctx,
-        //     should_be_covered
-        //         .iter()
-        //         .map(|x| x)
-        //         .collect::<Vec<&ast::Bool>>()
-        //         .as_slice(),
-        // );
         optimizer.assert(&job_covered);
     }
 
