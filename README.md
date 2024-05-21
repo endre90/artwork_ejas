@@ -203,6 +203,7 @@ Where the parts are:
 1. $\Phi$ - Total Preference Score :
    - Maximize the assignments to jobs that workers prefer.
    - $(M - P_{ij})$ ensures higher scores for more preferred jobs since $P_{ij}$ is lower for higher preferred jobs (taken as index).
+
 $$
 \Phi = \sum_{i=1}^{N} \sum_{j=1}^{M} \sum_{t=1}^{T} (M - P_{ij}) \cdot x_{ijt}
 $$ 
@@ -226,7 +227,7 @@ $$
    - TODO: Determine a good value for $k$.
 
 $$
-\Gamma = \beta \sum_{i=1}^{N} \left| \sum_{j=1}^{M} \sum_{t=1}^{T} \left( P_{ij} \leq \sigma \right) \cdot x_{ijt} - \frac{T \cdot \sigma}{N} \right|, \quad \sigma=\left\lfloor \frac{k \cdot M}{100} \right\rfloor
+\Gamma = \beta \sum_{i=1}^{N} \left \| \sum_{j=1}^{M} \sum_{t=1}^{T} \left( P_{ij} \leq \sigma \right) \cdot x_{ijt} - \frac{T \cdot \sigma}{N} \right\|, \quad \sigma=\left\lfloor \frac{k \cdot M}{100} \right\rfloor
 $$
 
 4. $\Delta$ - Fairness Term 2: Minimization of Least Preferred Jobs:
@@ -241,15 +242,15 @@ $$
 
 1. Each internal worker is assigned to at most one job per time slot:
 
-   $$
-   \sum_{j=1}^{M} x_{ijt} \leq 1 \quad \forall i \in \{1, \ldots, N\}, \forall t \in \{1, \ldots, T\}
-   $$
+$$
+\sum_{j=1}^{M} x_{ijt} \leq 1 \quad \forall i \in \{1, \ldots, N\}, \forall t \in \{1, \ldots, T\}
+$$
 
 2. Each job is assigned to either one internal worker or one external worker per time slot:
 
-   $$
-   \sum_{i=1}^{N} x_{ijt} + e_{jt} = 1 \quad \forall j \in \{1, \ldots, M\}, \forall t \in \{1, \ldots, T\}
-   $$
+$$
+\sum_{i=1}^{N} x_{ijt} + e_{jt} = 1 \quad \forall j \in \{1, \ldots, M\}, \forall t \in \{1, \ldots, T\}
+$$
 
 3. Only assign jobs to competent employees:
 
@@ -259,6 +260,6 @@ $$
 
 4. Each job must be covered by at least one competent internal worker or an external worker:
 
-   $$
-   \sum_{i=1}^{N} C_{ij} \cdot x_{ijt} + e_{jt} \geq 1 \quad \forall j \in \{1, \ldots, M\}, \forall t \in \{1, \ldots, T\}
-   $$
+$$
+\sum_{i=1}^{N} C_{ij} \cdot x_{ijt} + e_{jt} \geq 1 \quad \forall j \in \{1, \ldots, M\}, \forall t \in \{1, \ldots, T\}
+$$
