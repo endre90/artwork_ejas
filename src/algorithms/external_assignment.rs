@@ -12,6 +12,7 @@ pub fn calculate_flexible_assignment(
     jobs: &Vec<String>,
     competence_map: &Vec<(String, Vec<String>)>,
     preference_map: &Vec<(String, Vec<String>)>,
+    lambda_penalty: usize
     // ) -> (SatResult, String) {
 ) -> (Vec<(String, String)>, Vec<String>, usize) {
     let anon_employees_map = employees
@@ -191,8 +192,10 @@ pub fn calculate_flexible_assignment(
         .map(|e_j| e_j.ite(&Int::from_i64(&ctx, 1), &Int::from_i64(&ctx, 0)))
         .fold(Int::from_i64(&ctx, 0), |acc, x| acc + x);
 
+
+
     optimizer.maximize(
-        &(&Int::add(&ctx, &preference_score_sum) - &(penalty * Int::from_i64(&ctx, 100))),
+        &(&Int::add(&ctx, &preference_score_sum) - &(penalty * Int::from_i64(&ctx, lambda_penalty as i64))),
     );
 
     // Check satisfiability and print the solution
@@ -335,7 +338,7 @@ mod tests {
             ), // employee c prefers job 1, then 2, then 0
         ];
 
-        let s = calculate_flexible_assignment(false, &employees, &jobs, &competences, &preferences);
+        let s = calculate_flexible_assignment(false, &employees, &jobs, &competences, &preferences, 100);
         println!("Optimal assignment: {:?}", s.0);
         println!("External assignment: {:?}", s.1);
         println!("Total preference score: {}", s.2);
@@ -395,7 +398,7 @@ mod tests {
         }
 
         let r = generate_random_data();
-        let s = calculate_flexible_assignment(false, &r.0, &r.1, &r.2, &r.3);
+        let s = calculate_flexible_assignment(false, &r.0, &r.1, &r.2, &r.3, 100);
         println!("Optimal assignment: {:?}", s.0);
         println!("External assignment: {:?}", s.1);
         println!("Total preference score: {}", s.2);

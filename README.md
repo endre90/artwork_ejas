@@ -231,7 +231,7 @@ $$
    - TODO: Determine a good value for $k$.
 
 $$
-\Gamma = \beta \sum_{i=1}^{N} abs\left(\sum_{j=1}^{M} \sum_{t=1}^{T} \left( P_{ij} \leq \sigma \right) \cdot x_{ijt} - \frac{T \cdot \sigma}{N} \right), \quad \sigma=\left\lfloor \frac{k \cdot M}{100} \right\rfloor
+\Gamma = \beta \sum_{i=1}^{N} abs\left(\sum_{j=1}^{M} \sum_{t=1}^{T} \left( P_{ij} \leq \sigma \right) \cdot x_{ijt} - \frac{T \cdot \sigma}{N} \right) , \quad \sigma=\left\lfloor \frac{k \cdot M}{100} \right\rfloor
 $$
 
 4. $\Delta$ - Fairness Term 2: Minimization of Least Preferred Jobs:
@@ -259,7 +259,7 @@ $$
 3. Only assign jobs to competent employees:
 
 $$
-x_{ijt} \implies C_{ijt} \quad \forall i, j, t
+x_{ijt} \implies C_{ij} \quad \forall i, j, t
 $$
 
 4. Each job must be covered by at least one competent internal worker or an external worker:
