@@ -11,12 +11,19 @@ pub struct Date {
 pub struct Day {
     pub date: Date,
     pub station: String,
-    pub pass_1: Option<Assignment>,
-    pub pass_2: Option<Assignment>,
-    pub pass_3: Option<Assignment>,
-    pub pass_4: Option<Assignment>,
-    pub team_leader: Operator
+    pub assignments: Vec<(String, String)> // (employee, job)
 }
+
+// #[derive(Debug, Clone)]
+// pub struct Day {
+//     pub date: Date,
+//     pub station: String,
+//     pub pass_1: Option<Assignment>,
+//     pub pass_2: Option<Assignment>,
+//     pub pass_3: Option<Assignment>,
+//     pub pass_4: Option<Assignment>,
+//     pub team_leader: Operator
+// }
 
 // #[derive(Debug, Clone)]
 // pub struct AnonymousDay {
