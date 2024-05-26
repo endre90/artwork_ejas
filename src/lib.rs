@@ -9,5 +9,5 @@ pub use crate::core::enums::*;
 pub mod algorithms;
 pub use crate::algorithms::static_assignment::*;
 pub use crate::algorithms::external_assignment::*;
-pub use crate::algorithms::fair_horizon_assignment::*;
-pub use crate::algorithms::fair_historic_assignment::*;
+pub use crate::algorithms::future_assignment::*;
+pub use crate::algorithms::historic_assignment::*;

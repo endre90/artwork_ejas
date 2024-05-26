@@ -363,7 +363,7 @@ fn build_preference_matrix(
 #[cfg(test)]
 mod tests {
 
-    use crate::algorithms::fair_historic_assignment::calculate_historic_matrix;
+    use crate::algorithms::historic_assignment::calculate_historic_matrix;
     use crate::*;
     use rand::seq::{IteratorRandom, SliceRandom};
     use rand::{thread_rng, Rng};

@@ -66,25 +66,25 @@ $$
 1. Each employee is assigned to at most one job:
 
 $$
-\sum_{j=1}^{M} x_{ij} \leq 1 \quad \forall i \in \{1, \ldots, N\}
+\sum_{j=1}^{M} x_{ij} \leq 1 \quad \forall i \in N
 $$
 
 2. Each job is assigned to exactly one employee:
 
 $$
-\sum_{i=1}^{N} x_{ij} = 1 \quad \forall j \in \{1, \ldots, M\}
+\sum_{i=1}^{N} x_{ij} = 1 \quad \forall j \in M
 $$
 
 3. Only assign jobs to competent employees:
 
 $$
-x_{ij} \implies C_{ij} \quad \forall i, j
+x_{ij} \implies C_{ij} \quad \forall i \in N, \forall j \in M
 $$
 
 4. Each job must be covered by at least one employee who is competent to perform it:
 
 $$
-\sum_{i=1}^{N} C_{ij} \cdot x_{ij} \geq 1 \quad \forall j \in \{1, \ldots, M\}
+\sum_{i=1}^{N} C_{ij} \cdot x_{ij} \geq 1 \quad \forall j \in M
 $$
 
 ## Step 2: External assignment
@@ -156,7 +156,7 @@ $$
 \sum_{i=1}^{N} C_{ij} \cdot x_{ij} + e_j \geq 1 \quad \forall j \in \{1, \ldots, M\}
 $$
 
-## Step 3: Fair assignment with horizon
+## Step 3a: Fair assignment with horizon
 
 This model ensures that employees are fairly rotated through their highly preferred jobs over a 2-week period, avoiding repeated assignments to their least preferred jobs. The fairness constraint is dynamically adjusted by the heuristic parameter \( k \), which defines the percentage of top preferred jobs considered for fair distribution. This promotes a balanced distribution of job assignments based on the specified preference percentage. The objective function balances maximizing the total preference score, minimizing the use of external employees, and promoting fairness in job assignments.
 
@@ -266,4 +266,76 @@ $$
 
 $$
 \sum_{i=1}^{N} C_{ij} \cdot x_{ijt} + e_{jt} \geq 1 \quad \forall j \in \{1, \ldots, M\}, \forall t \in \{1, \ldots, T\}
+$$
+
+## Step 3b: Fair assignment with historic data
+
+This model ensures that employees are fairly assigned a job for the current day, taking into account their preferences and competences while considering historical data to avoid over-assigning the same jobs to the same employees repeatedly. The objective function balances maximizing the total preference score, minimizing the use of external employees, and promoting fairness in job assignments.
+
+### Notation
+
+- $N$: Number of internal employees.
+- $M$: Number of jobs.
+- $\Tau$: Number of days to consider in the historical data.
+- $C_{ij}$: Binary competence matrix where $C_{ij} = 1$ if worker $i$ can perform job $j$, and $C_{ij} = 0$ otherwise.
+- $P_{ij}$: Preference rank matrix where $P_{ij}$ is the preference rank of job $j$ for worker $i$. Lower values in $P_{ij}$ indicate higher preference.
+- $H_{ij}(\Tau)$: Historical count matrix where $H_{ij}(\Tau)$ is the number of times worker $i$ has performed job $j$ in the past $\Tau$ days.
+- $x_{ij}$: Binary decision variable such that:
+  $$
+  x_{ij} =
+  \begin{cases} 
+  1 & \text{if worker } i \text{ is assigned to job } j \\ 
+  0 & \text{otherwise} 
+  \end{cases}
+  $$
+- $e_j$: Binary decision variable such that:
+  $$
+  e_j =
+  \begin{cases} 
+  1 & \text{if an external employee is assigned to job } j \\ 
+  0 & \text{otherwise} 
+  \end{cases}
+  $$
+- $\lambda$: Penalty factor for using external employees.
+- $\beta$: Weight for the fairness term.
+- $\alpha$: Maximum allowed number of assignments (including historical data) for any job.
+
+### Constraints
+
+1. Each internal worker is assigned to at most one job:
+
+   $$
+   \sum_{j=1}^{M} x_{ij} \leq 1 \quad \forall i \in \{1, \ldots, N\}
+   $$
+
+2. Each job is assigned to either one internal worker or one external worker:
+
+   $$
+   \sum_{i=1}^{N} x_{ij} + e_j = 1 \quad \forall j \in \{1, \ldots, M\}
+   $$
+
+3. Only assign jobs to employees who are competent to perform them:
+
+   $$
+   x_{ij} \leq C_{ij} \quad \forall i, j
+   $$
+
+4. Each job must be covered by at least one competent internal worker or an external worker:
+
+   $$
+   \sum_{i=1}^{N} C_{ij} \cdot x_{ij} + e_j \geq 1 \quad \forall j \in \{1, \ldots, M\}
+   $$
+
+5. Limit the maximum number of assignments (including historical data):
+
+   $$
+   H_{ij}(\tau) + x_{ij} \leq \alpha \quad \forall i \in \{1, \ldots, N\}, \forall j \in \{1, \ldots, M\}
+   $$
+
+### Objective Function
+
+The objective function can be expressed as:
+
+$$
+\text{Maximize} \sum_{i=1}^{N} \sum_{j=1}^{M} P_{ij} x_{ij} - \lambda \sum_{j=1}^{M} e_j - \beta \sum_{i=1}^{N} \sum_{j=1}^{M} \left( H_{ij}(\tau) + x_{ij} - \mu \right)^2
 $$
