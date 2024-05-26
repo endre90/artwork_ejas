@@ -279,23 +279,27 @@ This model ensures that employees are fairly assigned a job for the current day,
 - $\Tau$: Number of days to consider in the historical data.
 - $C_{ij}$: Binary competence matrix where $C_{ij} = 1$ if worker $i$ can perform job $j$, and $C_{ij} = 0$ otherwise.
 - $P_{ij}$: Preference rank matrix where $P_{ij}$ is the preference rank of job $j$ for worker $i$. Lower values in $P_{ij}$ indicate higher preference.
-- $H_{ij}(\Tau)$: Historical count matrix where $H_{ij}(\Tau)$ is the number of times worker $i$ has performed job $j$ in the past $\Tau$ days.
+- $H_{ij}(\tau)$: Historical count matrix where $H_{ij}(\tau)$ is the number of times worker $i$ has performed job $j$ in the past $\tau$ days.
 - $x_{ij}$: Binary decision variable such that:
-  $$
-  x_{ij} =
-  \begin{cases} 
-  1 & \text{if worker } i \text{ is assigned to job } j \\ 
-  0 & \text{otherwise} 
-  \end{cases}
-  $$
+
+$$
+x_{ij} =
+\begin{cases} 
+1 & \text{if worker } i \text{ is assigned to job } j \\ 
+0 & \text{otherwise} 
+\end{cases}
+$$
+
 - $e_j$: Binary decision variable such that:
-  $$
-  e_j =
-  \begin{cases} 
-  1 & \text{if an external employee is assigned to job } j \\ 
-  0 & \text{otherwise} 
-  \end{cases}
-  $$
+
+$$
+e_j =
+\begin{cases} 
+1 & \text{if an external employee is assigned to job } j \\ 
+0 & \text{otherwise} 
+\end{cases}
+$$
+
 - $\lambda$: Penalty factor for using external employees.
 - $\beta$: Weight for the fairness term.
 - $\alpha$: Maximum allowed number of assignments (including historical data) for any job.
@@ -304,33 +308,33 @@ This model ensures that employees are fairly assigned a job for the current day,
 
 1. Each internal worker is assigned to at most one job:
 
-   $$
-   \sum_{j=1}^{M} x_{ij} \leq 1 \quad \forall i \in \{1, \ldots, N\}
-   $$
+$$
+\sum_{j=1}^{M} x_{ij} \leq 1 \quad \forall i \in \{1, \ldots, N\}
+$$
 
 2. Each job is assigned to either one internal worker or one external worker:
 
-   $$
-   \sum_{i=1}^{N} x_{ij} + e_j = 1 \quad \forall j \in \{1, \ldots, M\}
-   $$
+$$
+\sum_{i=1}^{N} x_{ij} + e_j = 1 \quad \forall j \in \{1, \ldots, M\}
+$$
 
 3. Only assign jobs to employees who are competent to perform them:
 
-   $$
-   x_{ij} \leq C_{ij} \quad \forall i, j
-   $$
+$$
+x_{ij} \leq C_{ij} \quad \forall i, j
+$$
 
 4. Each job must be covered by at least one competent internal worker or an external worker:
 
-   $$
-   \sum_{i=1}^{N} C_{ij} \cdot x_{ij} + e_j \geq 1 \quad \forall j \in \{1, \ldots, M\}
-   $$
+$$
+\sum_{i=1}^{N} C_{ij} \cdot x_{ij} + e_j \geq 1 \quad \forall j \in \{1, \ldots, M\}
+$$
 
 5. Limit the maximum number of assignments (including historical data):
 
-   $$
-   H_{ij}(\tau) + x_{ij} \leq \alpha \quad \forall i \in \{1, \ldots, N\}, \forall j \in \{1, \ldots, M\}
-   $$
+$$
+H_{ij}(\tau) + x_{ij} \leq \alpha \quad \forall i \in \{1, \ldots, N\}, \forall j \in \{1, \ldots, M\}
+$$
 
 ### Objective Function
 
