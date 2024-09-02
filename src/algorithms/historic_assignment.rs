@@ -365,8 +365,8 @@ mod tests {
 
     use crate::algorithms::historic_assignment::calculate_historic_matrix;
     use crate::*;
-    use rand::seq::{IteratorRandom, SliceRandom};
-    use rand::{thread_rng, Rng};
+    use rand::seq::SliceRandom;
+    use rand::Rng;
 
     fn generate_historical_data() -> Vec<Day> {
         let history_of_assignments = vec![
@@ -857,10 +857,10 @@ mod tests {
         fn generate_historical_data() -> Vec<Day> {
             let employees = vec![
                 "Alice  ".to_string(),
-                "Bob      ".to_string(),
+                "Bob    ".to_string(),
                 "Charlie".to_string(),
                 "David  ".to_string(),
-                "Eve      ".to_string(),
+                "Eve    ".to_string(),
                 "Frank  ".to_string(),
                 "Grace  ".to_string(),
                 "Heidi  ".to_string(),
@@ -911,10 +911,10 @@ mod tests {
         // Define employees and jobs
         let employees = vec![
             "Alice  ".to_string(),
-            "Bob      ".to_string(),
+            "Bob    ".to_string(),
             "Charlie".to_string(),
             "David  ".to_string(),
-            "Eve      ".to_string(),
+            "Eve    ".to_string(),
             "Frank  ".to_string(),
             "Grace  ".to_string(),
             "Heidi  ".to_string(),

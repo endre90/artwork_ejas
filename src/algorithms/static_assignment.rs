@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use nanoid::nanoid;
 use z3::{
@@ -12,8 +12,7 @@ pub fn calculate_static_assignment(
     jobs: &Vec<String>,
     competence_map: &Vec<(String, Vec<String>)>,
     preference_map: &Vec<(String, Vec<String>)>,
-    // ) -> (SatResult, String) {
-) -> (Vec<(String, String)>, usize) {
+) -> (Vec<(String, String)>, usize, Vec<Vec<bool>>, Vec<Vec<usize>>) {
     let anon_employees_map = employees
         .iter()
         .map(|e| (e.to_owned(), nanoid!()))
@@ -197,16 +196,16 @@ pub fn calculate_static_assignment(
                 }
             }
 
-            println!("Solution found");
-            (assignment, total_score)
+            log::info!(target: "employee_job_assignment", "Solution found");
+            (assignment, total_score, competence_matrix, preference_matrix)
         }
         SatResult::Unsat => {
-            println!("No solution found");
-            (Vec::new(), 0)
+            log::warn!(target: "employee_job_assignment", "No solution found");
+            (Vec::new(), 0, competence_matrix, preference_matrix)
         }
         _ => {
-            println!("Solver failed");
-            (Vec::new(), 0)
+            log::error!(target: "employee_job_assignment", "Solver failed");
+            (Vec::new(), 0, competence_matrix, preference_matrix)
         }
     }
 }
@@ -264,268 +263,109 @@ fn build_preference_matrix(
     preference_matrix
 }
 
-// #[cfg(test)]
-// mod tests {
-
-//     use std::collections::HashSet;
-
-//     use crate::*;
-//     use rand::seq::{IteratorRandom, SliceRandom};
-//     use rand::thread_rng;
-
-//     #[test]
-//     fn test_static_assignment() {
-//         // Number of employees and jobs
-//         let employees = vec!["a", "b", "c"].iter().map(|x| x.to_string()).collect();
-//         let jobs = vec!["0", "1", "2"].iter().map(|x| x.to_string()).collect();
-
-//         let competences = vec![
-//             (
-//                 "a".to_string(),
-//                 vec!["0", "2"].iter().map(|x| x.to_string()).collect(),
-//             ), // employee a can perform jobs 0 and 2
-//             (
-//                 "b".to_string(),
-//                 vec!["0", "1"].iter().map(|x| x.to_string()).collect(),
-//             ), // employee b can perform jobs 0 and 1
-//             (
-//                 "c".to_string(),
-//                 vec!["1"].iter().map(|x| x.to_string()).collect(),
-//             ), // employee c can perform jobs 1 and 2
-//         ];
-
-//         let preferences = vec![
-//             (
-//                 "a".to_string(),
-//                 vec!["2", "0", "1"].iter().map(|x| x.to_string()).collect(),
-//             ), // employee a prefers job 2, then 0, then 1
-//             (
-//                 "b".to_string(),
-//                 vec!["2", "1", "0"].iter().map(|x| x.to_string()).collect(),
-//             ), // employee b prefers job 2, then 1, then 0
-//             (
-//                 "c".to_string(),
-//                 vec!["1", "2", "0"].iter().map(|x| x.to_string()).collect(),
-//             ), // employee c prefers job 1, then 2, then 0
-//         ];
-
-//         let s = calculate_static_assignment(false, &employees, &jobs, &competences, &preferences);
-//         println!("Optimal assignment: {:?}", s.0);
-//         println!("Total preference score: {}", s.1);
-//         assert_eq!(
-//             s.0,
-//             [
-//                 ("a".to_string(), "2".to_string()),
-//                 ("b".to_string(), "0".to_string()),
-//                 ("c".to_string(), "1".to_string())
-//             ]
-//         );
-//         assert_eq!(s.1, 4);
-//     }
-
-//     #[test]
-//     fn test_static_assignment_random() {
-//         fn validate_static_assignment(
-//             assignment: &Vec<(String, String)>,
-//             competence_map: &Vec<(String, Vec<String>)>,
-//             preference_map: &Vec<(String, Vec<String>)>,
-//             employees: &Vec<String>,
-//             jobs: &Vec<String>,
-//         ) -> () {
-//             let mut assigned_jobs: HashSet<&String> = HashSet::new();
-//             let mut total_preference_score = 0;
-
-//             for (employee, job) in assignment {
-//                 // Check that each employee is assigned to at most one job
-//                 assert!(!assigned_jobs.contains(job));
-//                 assigned_jobs.insert(job);
-
-//                 // Check that employees are assigned to jobs they are competent for
-//                 let employee_competences = competence_map
-//                     .iter()
-//                     .find(|(e, _)| e == employee)
-//                     .unwrap()
-//                     .1
-//                     .clone();
-//                 assert!(employee_competences.contains(job));
-
-//                 // Check that the preferences are maximized
-//                 let preferences = preference_map
-//                     .iter()
-//                     .find(|(e, _)| e == employee)
-//                     .unwrap()
-//                     .1
-//                     .clone();
-//                 if let Some(position) = preferences.iter().position(|p| p == job) {
-//                     total_preference_score += jobs.len() - position;
-//                 }
-//             }
-
-//             // Check that each job is assigned to exactly one employee
-//             assert_eq!(assigned_jobs.len(), jobs.len());
-
-//             // Calculate the theoretical maximum preference score
-//             let max_preference_score: usize = employees
-//                 .iter()
-//                 .map(|employee| {
-//                     if let Some((_, preferences)) =
-//                         preference_map.iter().find(|(e, _)| e == employee)
-//                     {
-//                         let sum: usize = preferences
-//                             .iter()
-//                             .enumerate()
-//                             .map(|(rank, _)| jobs.len() - rank)
-//                             .sum();
-//                         sum
-//                     } else {
-//                         panic!("Employee {} not found in preference_map", employee);
-//                     }
-//                 })
-//                 .sum();
-
-//             // Ensure the total preference score is maximized
-//             assert_eq!(total_preference_score, max_preference_score);
-//         }
-
-//         fn generate_random_data() -> (
-//             Vec<String>,
-//             Vec<String>,
-//             Vec<(String, Vec<String>)>,
-//             Vec<(String, Vec<String>)>,
-//         ) {
-//             let employees = vec!["Megan", "Bob", "Carol", "David", "Eve"]
-//                 .iter()
-//                 .map(|x| x.to_string())
-//                 .collect::<Vec<_>>();
-
-//             let jobs = vec!["Job1", "Job2", "Job3", "Job4", "Job5"]
-//                 .iter()
-//                 .map(|x| x.to_string())
-//                 .collect::<Vec<_>>();
-
-//             let mut rng = thread_rng();
-
-//             let mut competences = vec![];
-//             for employee in &employees {
-//                 let num_competences = (1..=jobs.len()).choose(&mut rng).unwrap();
-//                 let employee_competences = jobs
-//                     .choose_multiple(&mut rng, num_competences)
-//                     .cloned()
-//                     .collect();
-//                 competences.push((employee.clone(), employee_competences));
-//             }
-
-//             let mut preferences = vec![];
-//             for employee in &employees {
-//                 let num_preferences = (1..=jobs.len()).choose(&mut rng).unwrap();
-//                 let employee_preferences = jobs
-//                     .choose_multiple(&mut rng, num_preferences)
-//                     .cloned()
-//                     .collect();
-//                 preferences.push((employee.clone(), employee_preferences));
-//             }
-
-//             (employees, jobs, competences, preferences)
-//         }
-
-//         let r = generate_random_data();
-//         let s = calculate_static_assignment(false, &r.0.clone(), &r.1, &r.2, &r.3);
-//         validate_static_assignment(&s.0, &r.2, &r.3, &r.0, &r.1);
-//         println!("Optimal assignment: {:?}", s.0);
-//         println!("Total preference score: {}", s.1);
-//     }
-// }
-
-
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use rand::seq::SliceRandom;
+
+    use crate::*;
+    use rand::seq::{IteratorRandom, SliceRandom};
     use rand::thread_rng;
 
-    fn generate_test_data() -> (
-        Vec<String>,
-        Vec<String>,
-        Vec<(String, Vec<String>)>,
-        Vec<(String, Vec<String>)>
-    ) {
-        let employees = vec![
-            "Megan".to_string(),
-            "Bob".to_string(),
-            "Carol".to_string(),
-            "David".to_string(),
-            "Eve".to_string(),
+    #[test]
+    fn test_static_assignment() {
+        // Number of employees and jobs
+        let employees = vec!["a", "b", "c"].iter().map(|x| x.to_string()).collect();
+        let jobs = vec!["0", "1", "2"].iter().map(|x| x.to_string()).collect();
+
+        let competences = vec![
+            (
+                "a".to_string(),
+                vec!["0", "2"].iter().map(|x| x.to_string()).collect(),
+            ), // employee a can perform jobs 0 and 2
+            (
+                "b".to_string(),
+                vec!["0", "1"].iter().map(|x| x.to_string()).collect(),
+            ), // employee b can perform jobs 0 and 1
+            (
+                "c".to_string(),
+                vec!["1"].iter().map(|x| x.to_string()).collect(),
+            ), // employee c can perform jobs 1 and 2
         ];
 
-        let jobs = vec![
-            "Job1".to_string(),
-            "Job2".to_string(),
-            "Job3".to_string(),
-            "Job4".to_string(),
-            "Job5".to_string(),
+        let preferences = vec![
+            (
+                "a".to_string(),
+                vec!["2", "0", "1"].iter().map(|x| x.to_string()).collect(),
+            ), // employee a prefers job 2, then 0, then 1
+            (
+                "b".to_string(),
+                vec!["2", "1", "0"].iter().map(|x| x.to_string()).collect(),
+            ), // employee b prefers job 2, then 1, then 0
+            (
+                "c".to_string(),
+                vec!["1", "2", "0"].iter().map(|x| x.to_string()).collect(),
+            ), // employee c prefers job 1, then 2, then 0
         ];
 
-        let mut rng = thread_rng();
-
-        let competence_map: Vec<(String, Vec<String>)> = employees.iter().map(|e| {
-            let competences = jobs.choose_multiple(&mut rng, 3).cloned().collect();
-            (e.clone(), competences)
-        }).collect();
-
-        let preference_map: Vec<(String, Vec<String>)> = employees.iter().map(|e| {
-            let mut preferences = jobs.clone();
-            preferences.shuffle(&mut rng);
-            (e.clone(), preferences)
-        }).collect();
-
-        (employees, jobs, competence_map, preference_map)
+        let s = calculate_static_assignment(false, &employees, &jobs, &competences, &preferences);
+        println!("Optimal assignment: {:?}", s.0);
+        println!("Total preference score: {}", s.1);
+        assert_eq!(
+            s.0,
+            [
+                ("a".to_string(), "2".to_string()),
+                ("b".to_string(), "0".to_string()),
+                ("c".to_string(), "1".to_string())
+            ]
+        );
+        assert_eq!(s.1, 4);
     }
 
     #[test]
-    fn test_calculate_static_assignment() {
-        let (employees, jobs, competence_map, preference_map) = generate_test_data();
-        
-        // Call the function with anonymize set to false
-        let (assignments, total_score) = calculate_static_assignment(
-            false,
-            &employees,
-            &jobs,
-            &competence_map,
-            &preference_map,
-        );
+    fn test_static_assignment_random() {
+        fn generate_random_data() -> (
+            Vec<String>,
+            Vec<String>,
+            Vec<(String, Vec<String>)>,
+            Vec<(String, Vec<String>)>,
+        ) {
+            let employees = vec!["Megan", "Bob", "Carol", "David", "Eve"]
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<_>>();
 
-        // Verify assignments
-        let mut assigned_jobs = vec![false; jobs.len()];
-        let mut employee_assignments = vec![false; employees.len()];
+            let jobs = vec!["Job1", "Job2", "Job3", "Job4", "Job5"]
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<_>>();
 
-        for (employee, job) in &assignments {
-            let employee_index = employees.iter().position(|e| e == employee).unwrap();
-            let job_index = jobs.iter().position(|j| j == job).unwrap();
+            let mut rng = thread_rng();
 
-            // Check each employee is assigned to at most one job
-            assert!(!employee_assignments[employee_index], "Employee assigned to multiple jobs");
-            employee_assignments[employee_index] = true;
+            let mut competences = vec![];
+            for employee in &employees {
+                let num_competences = (1..=jobs.len()).choose(&mut rng).unwrap();
+                let employee_competences = jobs
+                    .choose_multiple(&mut rng, num_competences)
+                    .cloned()
+                    .collect();
+                competences.push((employee.clone(), employee_competences));
+            }
 
-            // Check each job is assigned to exactly one employee
-            assert!(!assigned_jobs[job_index], "Job assigned to multiple employees");
-            assigned_jobs[job_index] = true;
+            let mut preferences = vec![];
+            for employee in &employees {
+                let num_preferences = (1..=jobs.len()).choose(&mut rng).unwrap();
+                let employee_preferences = jobs
+                    .choose_multiple(&mut rng, num_preferences)
+                    .cloned()
+                    .collect();
+                preferences.push((employee.clone(), employee_preferences));
+            }
 
-            // Check competence constraints
-            assert!(competence_map[employee_index].1.contains(job), "Incompetent assignment");
+            (employees, jobs, competences, preferences)
         }
 
-        // Check that all jobs are assigned
-        assert!(assigned_jobs.iter().all(|&assigned| assigned), "Not all jobs assigned");
-
-        // Verify total preference score
-        let calculated_score = assignments.iter().map(|(employee, job)| {
-            let employee_index = employees.iter().position(|e| e == employee).unwrap();
-            let job_index = jobs.iter().position(|j| j == job).unwrap();
-            let preferences = &preference_map[employee_index].1;
-            let rank = preferences.iter().position(|pref| pref == job).unwrap();
-            (jobs.len() - rank) as usize
-        }).sum::<usize>();
-
-        assert_eq!(total_score, calculated_score, "Incorrect total preference score");
+        let r = generate_random_data();
+        let s = calculate_static_assignment(false, &r.0.clone(), &r.1, &r.2, &r.3);
+        println!("Optimal assignment: {:?}", s.0);
+        println!("Total preference score: {}", s.1);
     }
 }

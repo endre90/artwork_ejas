@@ -1,4 +1,4 @@
-use super::enums::Operator;
+use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone)]
 pub struct Date {
@@ -14,39 +14,22 @@ pub struct Day {
     pub assignments: Vec<(String, String)> // (employee, job)
 }
 
-// #[derive(Debug, Clone)]
-// pub struct Day {
-//     pub date: Date,
-//     pub station: String,
-//     pub pass_1: Option<Assignment>,
-//     pub pass_2: Option<Assignment>,
-//     pub pass_3: Option<Assignment>,
-//     pub pass_4: Option<Assignment>,
-//     pub team_leader: Operator
-// }
-
-// #[derive(Debug, Clone)]
-// pub struct AnonymousDay {
-//     pub date: Date,
-//     pub pass_1: Option<AnonymousAssignment>,
-//     pub pass_2: Option<AnonymousAssignment>,
-//     pub pass_3: Option<AnonymousAssignment>,
-//     pub pass_4: Option<AnonymousAssignment>,
-//     pub team_leader: 
-// }
-
-#[derive(Debug, Clone)]
-pub struct Assignment {
-    pub bbm: Operator,
-    pub drag: Operator,
-    pub slap: Operator,
-    pub kkm: Operator,
-    pub fuse: Operator,
-    pub tank: Operator,
-    pub batt: Operator,
-    pub topp: Operator
+#[derive(Serialize, Deserialize)]
+pub struct CompetenceEntry {
+    pub employee: String,
+    pub competences: Vec<String>,
 }
 
-// pub struct AnonymousAssignment {
+#[derive(Serialize, Deserialize)]
+pub struct PreferenceEntry {
+    pub employee: String,
+    pub preferences: Vec<String>,
+}
 
-// }
+#[derive(Serialize, Deserialize)]
+pub struct StaticAssignmentData {
+    pub employees: Vec<String>,
+    pub jobs: Vec<String>,
+    pub competence_map: Vec<CompetenceEntry>,
+    pub preference_map: Vec<PreferenceEntry>,
+}

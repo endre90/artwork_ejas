@@ -276,7 +276,7 @@ This model ensures that employees are fairly assigned a job for the current day,
 
 - $N$: Number of internal employees.
 - $M$: Number of jobs.
-- $\Tau$: Number of days to consider in the historical data.
+- $\tau$: Number of days to consider in the historical data.
 - $C_{ij}$: Binary competence matrix where $C_{ij} = 1$ if worker $i$ can perform job $j$, and $C_{ij} = 0$ otherwise.
 - $P_{ij}$: Preference rank matrix where $P_{ij}$ is the preference rank of job $j$ for worker $i$. Lower values in $P_{ij}$ indicate higher preference.
 - $H_{ij}(\tau)$: Historical count matrix where $H_{ij}(\tau)$ is the number of times worker $i$ has performed job $j$ in the past $\tau$ days.

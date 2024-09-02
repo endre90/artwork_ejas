@@ -1,4 +1,3 @@
-use core::time;
 use std::collections::HashMap;
 
 use nanoid::nanoid;
@@ -451,16 +450,6 @@ mod tests {
         println!("Optimal assignment: {:?}", s.0);
         println!("External assignment: {:?}", s.1);
         println!("Total preference score: {}", s.2);
-        // assert_eq!(
-        //     s.0,
-        //     [
-        //         ("a".to_string(), "2".to_string()),
-        //         ("b".to_string(), "1".to_string()),
-        //         ("c".to_string(), "0".to_string())
-        //     ]
-        // );
-        // assert_eq!(s.1, ["3".to_string(), "4".to_string()]);
-        // assert_eq!(s.2, 12);
     }
 
     #[test]
