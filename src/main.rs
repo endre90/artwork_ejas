@@ -1,15 +1,41 @@
-use artwork_ejas::*;
-use inquire::ui::{Attributes, Color, RenderConfig, StyleSheet, Styled};
-use inquire::Select;
-use std::time::Duration;
-use std::{fs, thread};
 use rusqlite::{params, Connection, Result};
-use inquire::{Text, Confirm, MultiSelect};
+use inquire::{ui::{Attributes, Color, IndexPrefix, RenderConfig, StyleSheet, Styled}, MultiSelect, Password, Select, Text};
 
 fn main() -> Result<()> {
     // Connect to the SQLite database (or create it if it doesn't exist)
     let conn = Connection::open("people.db")?;
 
+    // Create the necessary tables if they don't exist
+    setup_database(&conn)?;
+
+    // Check if any managers exist
+    let managing_users_count: i32 = conn.query_row(
+        "SELECT COUNT(*) FROM users WHERE role = 'Managing'",
+        [],
+        |row| row.get(0),
+    )?;
+
+    if managing_users_count == 0 {
+        // No managing users exist, enter setup mode
+        println!("No managing users found. Entering setup mode to create the first manager.");
+        setup_first_manager(&conn)?;
+    } else {
+        // Normal login process
+        login(&conn)?;
+    }
+
+    Ok(())
+}
+
+fn custom_renrer_config() -> RenderConfig<'static> {
+    let mut config = RenderConfig::default();
+    config.selected_option = Some(StyleSheet::new().with_fg(Color::DarkGreen));
+    config.answer = StyleSheet::new().with_fg(Color::DarkGreen).with_attr(Attributes::BOLD);
+    config.highlighted_option_prefix = Styled::new(" ->").with_fg(Color::DarkGreen).with_attr(Attributes::BOLD);
+    config
+}
+
+fn setup_database(conn: &Connection) -> Result<()> {
     // Create the 'people' table if it doesn't exist
     conn.execute(
         "CREATE TABLE IF NOT EXISTS people (
@@ -41,295 +67,382 @@ fn main() -> Result<()> {
         [],
     )?;
 
-    // Predefined list of competences
-    let competences = vec![
-        "Programming",
-        "Project Management",
-        "Design",
-        "Data Analysis",
-        "Communication",
-        "Leadership",
-    ];
+    // Create the 'users' table to store managing users and operators
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS users (
+                  id INTEGER PRIMARY KEY,
+                  username TEXT NOT NULL UNIQUE,
+                  password TEXT,   -- Only managing users need a password
+                  role TEXT NOT NULL  -- 'Managing' or 'Operator'
+                  )",
+        [],
+    )?;
 
-    // Insert predefined competences into the 'competences' table
-    for competence in &competences {
-        conn.execute(
-            "INSERT OR IGNORE INTO competences (name) VALUES (?1)",
-            params![competence],
-        )?;
-    }
+    Ok(())
+}
 
-    loop {
-        // Use `inquire` to ask the user for a name and job
-        let name = Text::new("Enter the person's name:")
-            .prompt()
-            .unwrap();
-        let job = Text::new("Enter the person's job:")
-            .prompt()
-            .unwrap();
+// Function to handle first-time setup (create first manager)
+fn setup_first_manager(conn: &Connection) -> Result<()> {
+    println!("Create the first managing user:");
+    
+    let username = Text::new("Enter username for the first manager:").prompt().unwrap();
+    let password = Password::new("Enter password for the first manager:").prompt().unwrap();
 
-        // Insert the data into the 'people' table
-        conn.execute(
-            "INSERT INTO people (name, job) VALUES (?1, ?2)",
-            params![name, job],
-        )?;
+    // Insert the first managing user into the 'users' table
+    conn.execute(
+        "INSERT INTO users (username, password, role) VALUES (?1, ?2, 'Managing')",
+        params![username, password],
+    )?;
 
-        // Get the ID of the newly inserted person
-        let person_id: i32 = conn.last_insert_rowid() as i32;
+    println!("First managing user created successfully.");
+    Ok(())
+}
 
-        // Use `inquire` to select competences from the predefined list
-        let selected_competences = MultiSelect::new(
-            "Select competences (use space to select, enter to confirm):",
-            competences.clone(),
-        )
+
+// Function to handle login and routing based on user role
+fn login(conn: &Connection) -> Result<()> {
+
+
+
+    // Select whether to log in as Managing or Operator
+    let role = Select::new("Select your role:", vec!["Managing", "Operator"])
+    .with_render_config(custom_renrer_config())
         .prompt()
         .unwrap();
 
-        // Insert the selected competences into the junction table
-        for competence in selected_competences {
-            let competence_id: i32 = conn.query_row(
-                "SELECT id FROM competences WHERE name = ?1",
-                params![competence],
-                |row| row.get(0),
-            )?;
-            conn.execute(
-                "INSERT INTO person_competences (person_id, competence_id) VALUES (?1, ?2)",
-                params![person_id, competence_id],
-            )?;
-        }
-
-        // Ask if the user wants to add another person
-        let add_another = Confirm::new("Do you want to add another person?")
-            .prompt()
-            .unwrap();
-
-        if !add_another {
-            break;
-        }
+    match role {
+        "Managing" => managing_login(conn),
+        "Operator" => operator_login(conn),
+        _ => Ok(()),
     }
+}
 
-    // Query and display all rows in the 'people' table with their competences
-    let mut stmt = conn.prepare(
-        "SELECT people.id, people.name, people.job, GROUP_CONCAT(competences.name, ', ') as competences
-         FROM people
-         LEFT JOIN person_competences ON people.id = person_competences.person_id
-         LEFT JOIN competences ON person_competences.competence_id = competences.id
-         GROUP BY people.id, people.name, people.job",
+// Managing user login function
+fn managing_login(conn: &Connection) -> Result<()> {
+    let username = Text::new("Enter username:").prompt().unwrap();
+    let password = Password::new("Enter password:").without_confirmation().prompt().unwrap();
+
+    // Validate managing user
+    let valid_user = conn.query_row(
+        "SELECT COUNT(*) FROM users WHERE username = ?1 AND password = ?2 AND role = 'Managing'",
+        params![username, password],
+        |row| row.get::<_, i32>(0),
     )?;
-    let person_iter = stmt.query_map([], |row| {
-        Ok(PersonWithCompetences {
-            id: row.get(0)?,
-            name: row.get(1)?,
-            job: row.get(2)?,
-            competences: row.get(3)?,
-        })
-    })?;
 
-    println!("People stored in the database with their competences:");
-    for person in person_iter {
-        println!("{:?}", person?);
+    if valid_user == 1 {
+        println!("Managing user logged in.");
+        managing_menu(conn)
+    } else {
+        println!("Invalid username or password.");
+        Ok(())
+    }
+}
+
+// Operator login function
+fn operator_login(conn: &Connection) -> Result<()> {
+    let username = Text::new("Enter your name:").prompt().unwrap();
+
+    // Validate if the user is an operator
+    let valid_user = conn.query_row(
+        "SELECT COUNT(*) FROM users WHERE username = ?1 AND role = 'Operator'",
+        params![username],
+        |row| row.get::<_, i32>(0),
+    )?;
+
+    if valid_user == 1 {
+        println!("Operator logged in.");
+        operator_menu(conn, username)
+    } else {
+        println!("Invalid operator name.");
+        Ok(())
+    }
+}
+
+// Menu for managing users
+fn managing_menu(conn: &Connection) -> Result<()> {
+    loop {
+        let choice = Select::new("Managing menu:", vec![
+            "Add a new Operator",
+            "Remove an Operator",
+            "Add a new Manager",
+            "Add new Competence",
+            "Assign Competences to Operator",
+            "Overview of Operators and Competences",  // New Option
+            "Exit"
+        ])
+        .prompt()
+        .unwrap();
+
+        match choice {
+            "Add a new Operator" => add_operator(conn)?,
+            "Remove an Operator" => remove_operator(conn)?,
+            "Add a new Manager" => add_manager(conn)?,
+            "Add new Competence" => add_competence(conn)?,
+            "Assign Competences to Operator" => assign_competences_to_operator(conn)?,
+            "Overview of Operators and Competences" => overview_operators_competences(conn)?,  // New functionality
+            "Exit" => break,
+            _ => (),
+        }
     }
 
     Ok(())
 }
 
-// Struct to hold person data with competences
-#[derive(Debug)]
-struct PersonWithCompetences {
-    id: i32,
-    name: String,
-    job: String,
-    competences: Option<String>,  // Competences as a comma-separated string
+// Menu for operators
+fn operator_menu(conn: &Connection, username: String) -> Result<()> {
+    loop {
+        let choice = Select::new("Operator menu:", vec![
+            "Change your job preference",
+            "Exit"
+        ])
+        .prompt()
+        .unwrap();
+
+        match choice {
+            "Change your job preference" => change_job_preference(conn, &username)?,
+            "Exit" => break,
+            _ => (),
+        }
+    }
+
+    Ok(())
+}
+
+fn add_operator(conn: &Connection) -> Result<()> {
+    // Prompt the user for the operator's name or to cancel by pressing Enter with empty input
+    let username = Text::new("Enter new Operator's name:")
+    .with_help_message("press Enter without typing anything to cancel")
+        .prompt()
+        .unwrap();
+
+    // Check if the input is empty (indicating the user wants to cancel)
+    if username.trim().is_empty() {
+        println!("Operation canceled.");
+        return Ok(());
+    }
+
+    // Insert operator into 'users' table with role 'Operator'
+    conn.execute(
+        "INSERT INTO users (username, role) VALUES (?1, 'Operator')",
+        params![username],
+    )?;
+
+    println!("Operator added successfully.");
+    Ok(())
+}
+
+fn remove_operator(conn: &Connection) -> Result<()> {
+    // Fetch the list of operators
+    let mut stmt = conn.prepare("SELECT username FROM users WHERE role = 'Operator'")?;
+    let operators = stmt.query_map([], |row| Ok(row.get::<_, String>(0)?))?;
+
+    let operator_list: Vec<String> = operators.collect::<Result<Vec<_>, _>>()?;
+
+    // If no operators exist, return immediately
+    if operator_list.is_empty() {
+        println!("No operators found.");
+        return Ok(());
+    }
+
+    // Add "Cancel" option to the list of operators
+    let mut operator_list_with_cancel = operator_list.clone();
+    operator_list_with_cancel.push("Cancel".to_string());
+
+    // Select an operator to remove or select "Cancel"
+    let selected_operator = Select::new("Select the Operator to remove (or select 'Cancel' to go back):", operator_list_with_cancel)
+        .prompt()
+        .unwrap();
+
+    // Check if the user selected "Cancel"
+    if selected_operator == "Cancel" {
+        println!("Operation canceled.");
+        return Ok(());
+    }
+
+    // Remove the operator from the 'users' table
+    conn.execute(
+        "DELETE FROM users WHERE username = ?1 AND role = 'Operator'",
+        params![selected_operator],
+    )?;
+
+    println!("Operator removed successfully.");
+    Ok(())
 }
 
 
-// fn main() -> Result<()> {
-//     // Connect to the SQLite database (or create it if it doesn't exist)
-//     let conn = Connection::open("people.db")?;
+// Function to add a new manager
+fn add_manager(conn: &Connection) -> Result<()> {
+    let username = Text::new("Enter new Manager's username:").prompt().unwrap();
+    let password = Password::new("Enter new Manager's password:").prompt().unwrap();
 
-//     // Create the 'people' table if it doesn't exist
-//     conn.execute(
-//         "CREATE TABLE IF NOT EXISTS people (
-//                   id INTEGER PRIMARY KEY,
-//                   name TEXT NOT NULL,
-//                   job TEXT NOT NULL
-//                   )",
-//         [],
-//     )?;
+    // Insert new manager into 'users' table with role 'Managing'
+    conn.execute(
+        "INSERT INTO users (username, password, role) VALUES (?1, ?2, 'Managing')",
+        params![username, password],
+    )?;
 
-//     loop {
-//         // Use `inquire` to ask the user for a name and job
-//         let name = Text::new("Enter the person's name:")
-//             .prompt()
-//             .unwrap();
-//         let job = Text::new("Enter the person's job:")
-//             .prompt()
-//             .unwrap();
+    println!("Manager added successfully.");
+    Ok(())
+}
 
-//         // Insert the data into the 'people' table
-//         conn.execute(
-//             "INSERT INTO people (name, job) VALUES (?1, ?2)",
-//             params![name, job],
-//         )?;
+// Function to add a new competence
+fn add_competence(conn: &Connection) -> Result<()> {
+    let competence = Text::new("Enter new competence:").prompt().unwrap();
 
-//         // Ask if the user wants to add another person
-//         let add_another = Confirm::new("Do you want to add another person?")
-//             .prompt()
-//             .unwrap();
+    // Insert new competence into the 'competences' table
+    conn.execute(
+        "INSERT OR IGNORE INTO competences (name) VALUES (?1)",
+        params![competence],
+    )?;
 
-//         if !add_another {
-//             break;
-//         }
-//     }
+    println!("Competence added successfully.");
+    Ok(())
+}
 
-//     // Query and display all rows in the 'people' table
-//     let mut stmt = conn.prepare("SELECT id, name, job FROM people")?;
-//     let person_iter = stmt.query_map([], |row| {
-//         Ok(Person {
-//             id: row.get(0)?,
-//             name: row.get(1)?,
-//             job: row.get(2)?,
-//         })
-//     })?;
+// Function for an operator to change their job preference
+fn change_job_preference(conn: &Connection, username: &str) -> Result<()> {
+    let new_job = Text::new("Enter your new job preference:").prompt().unwrap();
 
-//     println!("People stored in the database:");
-//     for person in person_iter {
-//         println!("{:?}", person?);
-//     }
+    // Update the job preference for the operator
+    conn.execute(
+        "UPDATE people SET job = ?1 WHERE name = ?2",
+        params![new_job, username],
+    )?;
 
-//     Ok(())
-// }
+    println!("Job preference updated.");
+    Ok(())
+}
 
-// // Struct to hold person data
-// #[derive(Debug)]
-// struct Person {
-//     id: i32,
-//     name: String,
-//     job: String,
-// }
+// Function to assign competences to an operator
+fn assign_competences_to_operator(conn: &Connection) -> Result<()> {
+    // Fetch the list of operators
+    let mut stmt = conn.prepare("SELECT username FROM users WHERE role = 'Operator'")?;
+    let operators = stmt.query_map([], |row| Ok(row.get::<_, String>(0)?))?;
 
+    let operator_list: Vec<String> = operators.collect::<Result<Vec<_>, _>>()?;
+    if operator_list.is_empty() {
+        println!("No operators found.");
+        return Ok(());
+    }
 
+    // Select an operator
+    let selected_operator = Select::new("Select an operator:", operator_list)
+        .prompt()
+        .unwrap();
 
+    // Fetch the list of competences
+    let mut stmt = conn.prepare("SELECT name FROM competences")?;
+    let competences = stmt.query_map([], |row| Ok(row.get::<_, String>(0)?))?;
 
-// fn main() {
-//     println!("");
+    let competence_list: Vec<String> = competences.collect::<Result<Vec<_>, _>>()?;
+    if competence_list.is_empty() {
+        println!("No competences found.");
+        return Ok(());
+    }
 
-//     let algorithms = vec!["Static", "External", "Horizon", "Historic"];
-//     let yes_no = vec!["Yes", "No"];
+    // Use MultiSelect to select competences
+    let selected_competences = MultiSelect::new(
+        "Select competences (use space to select, enter to confirm):",
+        competence_list,
+    )
+    .prompt()
+    .unwrap();
 
-//     let default: RenderConfig = RenderConfig::empty();
-//     let prompt_prefix = Styled::new("?")
-//         .with_fg(Color::DarkGreen)
-//         .with_attr(Attributes::BOLD);
-//     let prompt_choice = Styled::new(" ->")
-//         .with_fg(Color::DarkGreen)
-//         .with_attr(Attributes::BOLD);
-//     let mine = default.with_prompt_prefix(prompt_prefix);
-//     let mine = mine.with_highlighted_option_prefix(prompt_choice);
-//     let new_style_sheet = StyleSheet::empty();
-//     let mine = mine.with_answer(
-//         new_style_sheet
-//             .with_fg(Color::DarkGreen)
-//             .with_attr(Attributes::BOLD),
-//     );
+    // Get operator's ID
+    let operator_id: i32 = conn.query_row(
+        "SELECT id FROM users WHERE username = ?1 AND role = 'Operator'",
+        params![selected_operator],
+        |row| row.get(0),
+    )?;
 
-//     let selected_algorithm = Select::new("Select the algorithm:", algorithms.iter().map(|opt| opt.to_string()).collect())
-//         .with_page_size(4)
-//         .with_help_message("Use arrow keys to select an option, press Enter to select.] \n[For information about algorithms, look in the README.")
-//         .with_render_config(mine)
-//         .prompt()
-//         .unwrap();
+    // Insert selected competences for the operator
+    for competence in selected_competences {
+        let competence_id: i32 = conn.query_row(
+            "SELECT id FROM competences WHERE name = ?1",
+            params![competence],
+            |row| row.get(0),
+        )?;
 
-//     // let selected_anonymize = Select::new(
-//     //     "Do you want to anonymize data?",
-//     //     yes_no.iter().map(|opt| opt.to_string()).collect(),
-//     // )
-//     // .with_page_size(2)
-//     // .with_render_config(mine)
-//     // .with_help_message("Use arrow keys to select an option, press Enter to select.")
-//     // .with_render_config(mine)
-//     // .prompt()
-//     // .unwrap();
+        conn.execute(
+            "INSERT OR IGNORE INTO person_competences (person_id, competence_id) VALUES (?1, ?2)",
+            params![operator_id, competence_id],
+        )?;
+    }
 
-//     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
-//     let path = format!("{}/data", manifest_dir);
-//     let databases = list_frames_in_dir(&path);
+    println!("Competences assigned to operator successfully.");
+    Ok(())
+}
 
-//     let selected_path = match databases {
-//         Ok(datas) => Select::new(
-//             "Choose a database to process:",
-//             datas.iter().map(|opt| opt.to_string()).collect(),
-//         )
-//         .with_page_size(4)
-//         .with_render_config(mine)
-//         .with_help_message("Use arrow keys to select an option, press Enter to select.")
-//         .with_render_config(mine)
-//         .prompt()
-//         .unwrap(),
-//         Err(e) => panic!("{}", e),
-//     };
+// Function to display overview of operators and their competences
+fn overview_operators_competences(conn: &Connection) -> Result<()> {
+    // Fetch all operators from the database
+    let mut stmt = conn.prepare("SELECT id, username FROM users WHERE role = 'Operator'")?;
+    let operators = stmt.query_map([], |row| {
+        Ok(Operator {
+            id: row.get(0)?,
+            username: row.get(1)?,
+        })
+    })?;
 
-//     let selected_show_matrices = Select::new(
-//         "Show matrices?",
-//         yes_no.iter().map(|opt| opt.to_string()).collect(),
-//     )
-//     .with_page_size(2)
-//     .with_render_config(mine)
-//     .with_help_message("Use arrow keys to select an option, press Enter to select.")
-//     .with_render_config(mine)
-//     .prompt()
-//     .unwrap();
+    let operator_list: Vec<Operator> = operators.collect::<Result<Vec<_>, _>>()?;
+    if operator_list.is_empty() {
+        println!("No operators found.");
+        return Ok(());
+    }
 
-//     let data = match fs::read_to_string(selected_path) {
-//         Ok(json_string) => match serde_json::from_str::<StaticAssignmentData>(&json_string) {
-//             Ok(data) => data,
-//             Err(e) => panic!("{}", e),
-//         },
-//         Err(e) => panic!("{}", e),
-//     };
-
-//     let result = calculate_static_assignment(
-//         false,
-//         &data.employees,
-//         &data.jobs,
-//         &data
-//             .competence_map
-//             .iter()
-//             .map(|map| (map.employee.clone(), map.competences.clone()))
-//             .collect(),
-//         &data
-//             .preference_map
-//             .iter()
-//             .map(|map| (map.employee.clone(), map.preferences.clone()))
-//             .collect(),
+    // Loop through the list of operators and display their competences
+    let operator_usernames: Vec<String> = operator_list.iter().map(|op| op.username.clone()).collect();
     
-//     );
+    loop {
+        // Select an operator to view their competences
+        let selected_operator = Select::new("Select an operator to view their competences:", operator_usernames.clone())
+            .prompt()
+            .unwrap();
 
-//     println!("");
-//     println!("  Total preference score: {}", result.1);
-//     println!("");
-//     println!("  Optimal employee job assignment: ");
-//     for (employee, job) in result.0.clone() {
-//         println!("  {:<8} -> {}", employee, job);
-//     }
-//     println!("");
+        // Find the operator in the list and fetch their competences
+        let operator = operator_list.iter().find(|op| op.username == selected_operator).unwrap();
+        let competences = get_competences_for_operator(conn, operator.id)?;
 
-//     match selected_show_matrices.as_str() {
-//         "Yes" => {
-//             println!("  Competence matrix:");
-//             for i in 0..result.2.len() {
-//                 println!("  {:<8}  : {:?}", result.0[i].0, result.2[i].iter().map(|x| match x {
-//                     true => 1,
-//                     false => 0
-//                 }).collect::<Vec<i32>>())
-//             }
-//             println!("");
-//             println!("  Preference matrix:");
-//             for i in 0..result.2.len() {
-//                 println!("  {:<8}  : {:?}", result.0[i].0, result.3[i])
-//             }
-//         },
-//         _ => {}
-//     }
+        // Display the competences in a tree-like format
+        println!("Operator: {}", operator.username);
+        if competences.is_empty() {
+            println!("  No competences assigned.");
+        } else {
+            println!("  Competences:");
+            for competence in competences {
+                println!("    - {}", competence);
+            }
+        }
 
-// }
+        // Ask if the managing user wants to view another operator's competences
+        let view_another = Select::new("Do you want to view another operator's competences?", vec!["Yes", "No"])
+            .prompt()
+            .unwrap();
+
+        if view_another == "No" {
+            break;
+        }
+    }
+
+    Ok(())
+}
+
+// Helper function to get competences for a specific operator
+fn get_competences_for_operator(conn: &Connection, operator_id: i32) -> Result<Vec<String>> {
+    let mut stmt = conn.prepare(
+        "SELECT competences.name
+         FROM competences
+         JOIN person_competences ON competences.id = person_competences.competence_id
+         WHERE person_competences.person_id = ?1"
+    )?;
+
+    let competences = stmt.query_map(params![operator_id], |row| Ok(row.get::<_, String>(0)?))?;
+
+    competences.collect::<Result<Vec<_>, _>>()
+}
+
+// Struct to represent an operator
+struct Operator {
+    id: i32,
+    username: String,
+}
