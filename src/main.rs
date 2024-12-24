@@ -1,6 +1,21 @@
 use rusqlite::{params, Connection, Result};
 use inquire::{ui::{Attributes, Color, IndexPrefix, RenderConfig, StyleSheet, Styled}, MultiSelect, Password, Select, Text};
 
+// should have option to view history
+// need a help option probably
+// save history up till 6 months
+// encrypted database? probably no need to do that for now, neither anonymization
+// we can do some analytics based on the collected information, and show that the algorithm will actually perform better
+// start with a random historical distribution of 2 weeks, just noise, in order to predisct sho should do what
+// and then use the historic data every day to schedule fair task allocation
+// we probably don't need a long horizon, just the passes for the day
+// ensure that database is not lost, automatic backup somewhere, or send it somewhere?
+// quick way of selecting who is here today so that we can get a quick job allocation
+// overview for the next passes over the day (4 passes per day)
+// probably don't need to know who is doing what tomorrow, just for the day
+// but need to able to change the allocation if somebody leaves during the day
+// keep track of dates and times
+
 fn main() -> Result<()> {
     // Connect to the SQLite database (or create it if it doesn't exist)
     let conn = Connection::open("people.db")?;
