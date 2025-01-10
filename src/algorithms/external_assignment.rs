@@ -115,24 +115,24 @@ pub fn calculate_flexible_assignment(
         optimizer.assert(&at_most_one_job_per_employee);
     }
 
-    // Constraints: Each job is assigned to either one internal employee or one external employee
-    for j in 0..jobs.len() {
-        let job_constraints: Vec<_> = (0..employees.len()).map(|i| x[i][j].clone()).collect();
-        let at_most_one_employee_per_job = ast::Bool::pb_eq(
-            &ctx,
-            vec![e[j].clone()]
-                .into_iter()
-                .chain(job_constraints.into_iter())
-                .collect::<Vec<_>>()
-                .iter()
-                .map(|x| (x, 1))
-                .collect::<Vec<(&ast::Bool, i32)>>()
-                .as_slice(),
-            1,
-        );
+    // // Constraints: Each job is assigned to either one internal employee or one external employee
+    // for j in 0..jobs.len() {
+    //     let job_constraints: Vec<_> = (0..employees.len()).map(|i| x[i][j].clone()).collect();
+    //     let at_most_one_employee_per_job = ast::Bool::pb_eq(
+    //         &ctx,
+    //         vec![e[j].clone()]
+    //             .into_iter()
+    //             .chain(job_constraints.into_iter())
+    //             .collect::<Vec<_>>()
+    //             .iter()
+    //             .map(|x| (x, 1))
+    //             .collect::<Vec<(&ast::Bool, i32)>>()
+    //             .as_slice(),
+    //         1,
+    //     );
 
-        optimizer.assert(&at_most_one_employee_per_job);
-    }
+    //     optimizer.assert(&at_most_one_employee_per_job);
+    // }
 
     // Constraints: Only assign jobs that employees are competent to perform
     for i in 0..employees.len() {

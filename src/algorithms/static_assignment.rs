@@ -98,7 +98,6 @@ pub fn calculate_static_assignment(
         })
         .collect();
 
-
     // Constraints: Each employee is assigned at most one job
     for i in 0..employees.len() {
         let employee_constraints: Vec<_> = (0..jobs.len()).map(|j| x[i][j].clone()).collect();
@@ -127,8 +126,6 @@ pub fn calculate_static_assignment(
     }
 
     for j in 0..jobs.len() {
-        // If coverage_per_job[j] is the list of booleans for job j,
-        // we need the sum of those booleans to be >= 1.
         let job_covered = ast::Bool::pb_ge(
             &ctx,
             coverage_per_job[j]
@@ -158,7 +155,13 @@ pub fn calculate_static_assignment(
         for j in 0..jobs.len() {
             let rank = p_matrix[i][j];
             let score = (jobs.len() - rank) as i32;
-            preference_score.push((Bool::and(&ctx, vec![&x[i][j], &Bool::from_bool(&ctx, true)].as_slice()), score));
+            preference_score.push((
+                Bool::and(
+                    &ctx,
+                    vec![&x[i][j], &Bool::from_bool(&ctx, true)].as_slice(),
+                ),
+                score,
+            ));
         }
     }
 
@@ -306,7 +309,7 @@ mod tests {
         #[derive(Debug, Deserialize)]
         struct Person {
             pub name: String,
-            pub role: String,
+            // pub role: String,
             pub competences: Vec<String>,
             pub preferences: Vec<String>,
         }

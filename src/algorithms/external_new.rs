@@ -9,11 +9,13 @@ use z3::{
 
 use crate::*;
 
-pub fn calculate_static_assignment(
+pub fn calculate_external_assignment(
     station: &Station,
     alpha: u32, // How strongly to discourage leader usage
+    beta: u32,  // How strongly to discourage external operator usage
 ) -> (
     Vec<(String, String)>,
+    Vec<String>,
     usize,
     Vec<Vec<bool>>,
     Vec<Vec<usize>>,
@@ -54,6 +56,11 @@ pub fn calculate_static_assignment(
         })
         .collect();
 
+    // Create boolean variables for external assignments
+    let e: Vec<Bool> = (0..jobs.len())
+        .map(|j| Bool::new_const(&ctx, format!("e_{}", j)))
+        .collect();
+
     // Constraints: Each employee is assigned at most one job
     for i in 0..employees.len() {
         let employee_constraints: Vec<_> = (0..jobs.len()).map(|j| x[i][j].clone()).collect();
@@ -70,7 +77,26 @@ pub fn calculate_static_assignment(
         optimizer.assert(&at_most_one_job_per_employee);
     }
 
-    // Constraints: Each job must be covered by at least one competent worker
+    // Constraints: Each job is assigned exactry to either one internal employee or one external employee
+    for j in 0..jobs.len() {
+        let job_constraints: Vec<_> = (0..employees.len()).map(|i| x[i][j].clone()).collect();
+        let at_most_one_employee_per_job = ast::Bool::pb_eq(
+            &ctx,
+            vec![e[j].clone()]
+                .into_iter()
+                .chain(job_constraints.into_iter())
+                .collect::<Vec<_>>()
+                .iter()
+                .map(|x| (x, 1))
+                .collect::<Vec<(&ast::Bool, i32)>>()
+                .as_slice(),
+            1,
+        );
+
+        optimizer.assert(&at_most_one_employee_per_job);
+    }
+
+    // Constraints: Each job must be covered by at least one competent worker or one external worker
     let mut coverage_per_job: Vec<Vec<ast::Bool>> = vec![Vec::new(); jobs.len()];
 
     for i in 0..employees.len() {
@@ -82,6 +108,7 @@ pub fn calculate_static_assignment(
     }
 
     for j in 0..jobs.len() {
+        coverage_per_job[j].push(e[j].clone()); // Add the external worker option
         let job_covered = ast::Bool::pb_ge(
             &ctx,
             coverage_per_job[j]
@@ -146,6 +173,12 @@ pub fn calculate_static_assignment(
         }
     }
 
+    // Penalty for using external employees
+    let external_penalty_sum: Int = (Int::from_i64(&ctx, beta as i64)) * e
+        .iter()
+        .map(|e_j| e_j.ite(&Int::from_i64(&ctx, 1), &Int::from_i64(&ctx, 0)))
+        .fold(Int::from_i64(&ctx, 0), |acc, x| acc + x);
+
     // Variable to track the total preference score
     let pref_score = Int::new_const(&ctx, "pref_score");
 
@@ -154,19 +187,21 @@ pub fn calculate_static_assignment(
         let mut leader_penalties = Vec::new();
         for j in 0..jobs.len() {
             let penalty_if_leader =
-                x[l_i][j].ite(&Int::from_i64(&ctx, alpha as i64), &Int::from_i64(&ctx, 0));
+                x[l_i][j].ite(&Int::from_i64(&ctx, 1), &Int::from_i64(&ctx, 0));
             leader_penalties.push(penalty_if_leader);
         }
-        let leader_penalty_sum = Int::add(&ctx, &leader_penalties);
+        let leader_penalty_sum = Int::from_i64(&ctx, alpha as i64) * Int::add(&ctx, &leader_penalties);
 
-        // final_objective = preference_sum - sum_of_leader_penalties
-        let final_objective = Int::sub(&ctx, &[preference_sum_expr, leader_penalty_sum]);
+        // final_objective = preference_sum - sum_of_leader_penalties - 
+        let final_objective_pre = Int::sub(&ctx, &[preference_sum_expr, leader_penalty_sum]);
+        let final_objective = Int::sub(&ctx, &[final_objective_pre, external_penalty_sum]);
         optimizer.assert(&pref_score._eq(&final_objective));
         optimizer.maximize(&final_objective);
     } else {
         // If no leader, just use the original preference sum
-        optimizer.assert(&pref_score._eq(&preference_sum_expr));
-        optimizer.maximize(&preference_sum_expr);
+        let final_objective = Int::sub(&ctx, &[preference_sum_expr, external_penalty_sum]);
+        optimizer.assert(&pref_score._eq(&final_objective));
+        optimizer.maximize(&final_objective);
     }
 
     // Check satisfiability and print the solution
@@ -192,16 +227,23 @@ pub fn calculate_static_assignment(
                 }
             }
 
+            let mut external_assignments = Vec::new();
+            for j in 0..jobs.len() {
+                if model.eval(&e[j], true).unwrap().as_bool().unwrap() {
+                    external_assignments.push(jobs[j].clone());
+                }
+            }
+
             log::info!(target: "employee_job_assignment", "Solution found");
-            (assignment, pref_score as usize, c_matrix, p_matrix)
+            (assignment, external_assignments, pref_score as usize, c_matrix, p_matrix)
         }
         SatResult::Unsat => {
             log::warn!(target: "employee_job_assignment", "No solution found");
-            (Vec::new(), 0, c_matrix, p_matrix)
+            (Vec::new(), Vec::new(), 0, c_matrix, p_matrix)
         }
         _ => {
             log::error!(target: "employee_job_assignment", "Solver failed");
-            (Vec::new(), 0, c_matrix, p_matrix)
+            (Vec::new(), Vec::new(), 0, c_matrix, p_matrix)
         }
     }
 }
@@ -274,10 +316,11 @@ mod tests {
 
         let json_content = fs::read_to_string(path)?;
         let matrix: Matrix = serde_json::from_str(&json_content)?;
-        if let Some(station_1) = matrix.stations.get("S0") {
-            let s = calculate_static_assignment(station_1, 10);
-            println!("Optimal assignment: {:?}", s.0);
-            println!("Total preference score: {}", s.1);
+        if let Some(station_1) = matrix.stations.get("S2") {
+            let s = calculate_external_assignment(station_1, 4, 2);
+            println!("Optimal internal assignment: {:?}", s.0);
+            println!("Necessary external assignment: {:?}", s.1);
+            println!("Total preference score: {:?}", s.2);
         }
 
         Ok(())

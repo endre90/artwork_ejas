@@ -33,13 +33,24 @@ The remaining text shows the development steps of the EJAS for Artwork.
 ## Step 1: Static assignment
 The static assignment assigns $N$ employees to $M$ jobs based on their competences and preferences to maximize overall satisfaction. Each employee has a list of competences (indicating which jobs they can perform) and a ranked list of job preferences. The procedure creates binary decision variables to indicate assignments, and it aims to maximize the total preference score while ensuring each employee is assigned to at most one job, each job is covered by at most one employee, and every job is covered by at least one employee that is competent to perform it. The goal is to find an optimal static assignment that respects employees' competences and maximizes their preferences.
 
+### Objective Function
+
+Maximize the total preference score:
+
+$$
+\text{Maximize} \quad \sum_{i=1}^{N} \sum_{j=1}^{M} (M - P_{ij}) \cdot x_{ij} - \alpha \sum_{j=1}^{M} x_{kj} 
+$$
+
 ### Notation
 
-- $N$: 
-Number of employees
+- $N$: Number of employees
 - $M$: Number of jobs
+- $x_{ij}$: Binary decision vaiable representing operator $i$ performing job $j$
 - $C_{ij}$: Binary competence matrix where $C_{ij} = 1$ if employee $i$ can perform job $j$, and $C_{ij} = 0$ otherwise
 - $P_{ij}$: Preference rank matrix where $P_{ij}$ is the preference rank of job $j$ for employee $i$. Lower values (taken as index) in $P_{ij}$ indicate higher preference
+- $k$: Index of a team leader, if a team leader exists.
+- $\alpha$: How strongly to discourage the use of a team leader. The team leader is allocating operators and doing other work, so performing operations 
+should only be done when there is not enough competent operators in the station. 
 
 ### Decision Variables
 
@@ -53,14 +64,6 @@ x_{ij} =
 \end{cases}
 $$
 
-### Objective Function
-
-Maximize the total preference score:
-
-$$
-\text{Maximize} \quad \sum_{i=1}^{N} \sum_{j=1}^{M} (M - P_{ij}) \cdot x_{ij}
-$$
-
 ### Constraints
 
 1. Each employee is assigned to at most one job:
@@ -69,23 +72,24 @@ $$
 \sum_{j=1}^{M} x_{ij} \leq 1 \quad \forall i \in N
 $$
 
-2. Each job is assigned to exactly one employee:
+2. Each job is assigned exactly one employee:
 
 $$
-\sum_{i=1}^{N} x_{ij} = 1 \quad \forall j \in M
+\sum_{i=1}^{N} x_{ij} = 1 \quad \forall j \in \{1, \ldots, M\}
 $$
 
-3. Only assign jobs to competent employees:
+3. Each job must be covered by at least one employee who is competent to perform it:
+
+$$
+\sum_{i=1}^{N} C_{ij} \cdot x_{ij} \geq 1 \quad \forall j \in M
+$$
+
+4. Only assign jobs to competent employees (implication is used because the employee might be competent to perform the job, but doesn't have to be allocated to perform it):
 
 $$
 x_{ij} \implies C_{ij} \quad \forall i \in N, \forall j \in M
 $$
 
-4. Each job must be covered by at least one employee who is competent to perform it:
-
-$$
-\sum_{i=1}^{N} C_{ij} \cdot x_{ij} \geq 1 \quad \forall j \in M
-$$
 
 ## Step 2: External assignment
 In this step, the static assignment problem is extended with the possibility to have more jobs than employees, or to have jobs for which not enough competences exist. In this case, external employees can be allocated to complete the job, however this has a high cost and should be avoided if possible.
@@ -138,7 +142,7 @@ $$
 \sum_{j=1}^{M} x_{ij} \leq 1 \quad \forall i \in \{1, \ldots, N\}
 $$
 
-2. Each job is assigned to either one internal employee or one external employee:
+2. Each job is assigned exactly to either one internal employee or one external employee:
 
 $$
 \sum_{i=1}^{N} x_{ij} + e_j = 1 \quad \forall j \in \{1, \ldots, M\}
