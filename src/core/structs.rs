@@ -1,4 +1,29 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Deserialize)]
+pub struct Matrix {
+    pub stations: std::collections::HashMap<String, Station>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Station {
+    pub ergo_score: std::collections::HashMap<String, u8>,
+    pub people: Vec<Employee>,
+}
+
+#[derive(Debug, Deserialize)]
+pub enum Role {
+    TeamLeader,
+    Operator
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Employee {
+    pub name: String,
+    pub role: Role,
+    pub competences: Vec<String>,
+    pub preferences: Vec<String>,
+}
 
 #[derive(Debug, Clone)]
 pub struct Date {
@@ -11,7 +36,7 @@ pub struct Date {
 pub struct Day {
     pub date: Date,
     pub station: String,
-    pub assignments: Vec<(String, String)> // (employee, job)
+    pub assignments: Vec<(String, String)>, // (employee, job)
 }
 
 #[derive(Serialize, Deserialize)]

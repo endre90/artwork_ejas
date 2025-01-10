@@ -110,7 +110,7 @@ pub fn calculate_fair_horizon_assignment(
     let e: Vec<Vec<Bool>> = (0..jobs.len())
         .map(|j| {
             (0..time_horizon_days)
-                .map(|t| Bool::new_const(&ctx, format!("e_{}", j)))
+                .map(|_| Bool::new_const(&ctx, format!("e_{}", j)))
                 .collect()
         })
         .collect();

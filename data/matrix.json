@@ -1,7 +1,36 @@
 {
   "stations": {
+
+    "S0": {
+      "ergo_score": {
+        "O1": 7,
+        "O2": 3,
+        "O3": 9
+      },
+      "people": [
+        {
+          "name": "A",
+          "role": "TeamLeader",
+          "competences": ["O1", "O2"],
+          "preferences": ["O1", "O2"]
+        },
+        {
+          "name": "B",
+          "role": "Operator",
+          "competences": ["O2", "O3"],
+          "preferences": ["O2"]
+        },
+        {
+          "name": "C",
+          "role": "Operator",
+          "competences": ["O1", "O3"],
+          "preferences": ["O3"]
+        }
+      ]
+    },
+
     "S1": {
-      "operations": {
+      "ergo_score": {
         "O1": 7,
         "O2": 3,
         "O3": 9,
@@ -13,63 +42,51 @@
       "people": [
         {
           "name": "Ingrid",
-          "role": "TEAM_LEADER",
+          "role": "TeamLeader",
           "competences": ["O2", "O5"],
           "preferences": ["O2"]
         },
         {
           "name": "Alice",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O1", "O4", "O5"],
           "preferences": ["O1", "O5"]
         },
         {
           "name": "Bob",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O2", "O3", "O6", "O7"],
           "preferences": []
         },
         {
           "name": "Carol",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O1", "O2"],
           "preferences": ["O1"]
         },
         {
           "name": "Dave",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O2", "O5", "O7"],
           "preferences": ["O5"]
         },
         {
           "name": "Eve",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O3", "O4", "O6"],
           "preferences": ["O3", "O6"]
         },
         {
           "name": "Frank",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O1", "O6"],
           "preferences": ["O1"]
-        },
-        {
-          "name": "Grace",
-          "role": "OPERATOR",
-          "competences": ["O4", "O5"],
-          "preferences": ["O5"]
-        },
-        {
-          "name": "Helen",
-          "role": "OPERATOR",
-          "competences": ["O1", "O2", "O3", "O7"],
-          "preferences": ["O1", "O2", "O3", "O7"]
         }
       ]
     },
 
     "S2": {
-      "operations": {
+      "ergo_score": {
         "O1": 5,
         "O2": 7,
         "O3": 7,
@@ -83,67 +100,67 @@
       "people": [
         {
           "name": "Tina",
-          "role": "TEAM_LEADER",
+          "role": "TeamLeader",
           "competences": ["O3", "O6"],
           "preferences": ["O3"]
         },
         {
           "name": "John",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O1", "O9"],
           "preferences": ["O1"]
         },
         {
           "name": "Kelly",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O2", "O4", "O5", "O7"],
           "preferences": ["O4", "O7"]
         },
         {
           "name": "Luis",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O3", "O6", "O8"],
           "preferences": ["O3"]
         },
         {
           "name": "Maria",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O1", "O2", "O3", "O5", "O8"],
           "preferences": []
         },
         {
           "name": "Nathan",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O4", "O5", "O6", "O9"],
           "preferences": ["O5", "O6"]
         },
         {
           "name": "Olivia",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O1", "O7"],
           "preferences": ["O7"]
         },
         {
           "name": "Paul",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O3", "O8", "O9"],
           "preferences": ["O3"]
         },
         {
           "name": "Quentin",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O2", "O5", "O6"],
           "preferences": ["O2", "O5"]
         },
         {
           "name": "Rosa",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O1", "O2", "O3", "O6", "O9"],
           "preferences": ["O1", "O2", "O3", "O6", "O9"]
         },
         {
           "name": "Steve",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O1", "O4", "O7", "O8", "O9"],
           "preferences": ["O4", "O9"]
         }
@@ -151,7 +168,7 @@
     },
 
     "S3": {
-      "operations": {
+      "ergo_score": {
         "O1": 2,
         "O2": 8,
         "O3": 9,
@@ -162,49 +179,49 @@
       "people": [
         {
           "name": "Andrea",
-          "role": "TEAM_LEADER",
+          "role": "TeamLeader",
           "competences": ["O1", "O4"],
           "preferences": ["O1"]
         },
         {
           "name": "Uma",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O1", "O5"],
           "preferences": ["O5"]
         },
         {
           "name": "Victor",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O2", "O3", "O6"],
           "preferences": ["O2", "O6"]
         },
         {
           "name": "Wanda",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O1", "O2", "O4", "O5"],
           "preferences": ["O1", "O5"]
         },
         {
           "name": "Xavier",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O4", "O6"],
           "preferences": ["O4"]
         },
         {
           "name": "Yvonne",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O3", "O5"],
           "preferences": ["O3"]
         },
         {
           "name": "Zach",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O2", "O3", "O6"],
           "preferences": ["O3"]
         },
         {
           "name": "Brad",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O1", "O2", "O5", "O6"],
           "preferences": ["O1", "O5", "O6"]
         }
@@ -212,7 +229,7 @@
     },
 
     "S4": {
-      "operations": {
+      "ergo_score": {
         "O1": 8,
         "O2": 2,
         "O3": 5,
@@ -225,61 +242,61 @@
       "people": [
         {
           "name": "Linda",
-          "role": "TEAM_LEADER",
+          "role": "TeamLeader",
           "competences": ["O2", "O7"],
           "preferences": ["O2"]
         },
         {
           "name": "Charlie",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O1", "O8"],
           "preferences": ["O1"]
         },
         {
           "name": "Diana",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O2", "O3", "O4", "O7"],
           "preferences": ["O2", "O4"]
         },
         {
           "name": "Eric",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O1", "O4", "O6", "O8"],
           "preferences": ["O1", "O8"]
         },
         {
           "name": "Felicia",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O3", "O5", "O6"],
           "preferences": ["O3", "O5"]
         },
         {
           "name": "George",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O1", "O2", "O7", "O8"],
           "preferences": ["O1", "O7"]
         },
         {
           "name": "Hannah",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O4", "O5"],
           "preferences": ["O5"]
         },
         {
           "name": "Irene",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O3", "O7"],
           "preferences": ["O7"]
         },
         {
           "name": "Jack",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O2", "O5", "O6"],
           "preferences": ["O2", "O6"]
         },
         {
           "name": "Karl",
-          "role": "OPERATOR",
+          "role": "Operator",
           "competences": ["O4", "O8"],
           "preferences": ["O4"]
         }

@@ -178,7 +178,7 @@ pub fn calculate_fair_historic_assignment(
     }
 
     // Parameters for fairness
-    let alpha = 2; // Maximum allowed count for any job
+    let _alpha = 2; // Maximum allowed count for any job
     let mu = (jobs.len() as f64 / employees.len() as f64).ceil() as i32;
     let beta = 1; // Weight for fairness term
 

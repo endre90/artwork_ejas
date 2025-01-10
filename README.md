@@ -343,3 +343,9 @@ The objective function can be expressed as:
 $$
 \text{Maximize} \sum_{i=1}^{N} \sum_{j=1}^{M} P_{ij} x_{ij} - \lambda \sum_{j=1}^{M} e_j - \beta \sum_{i=1}^{N} \sum_{j=1}^{M} \left( H_{ij}(\tau) + x_{ij} - \mu \right)^2
 $$
+
+OR ???:
+
+$$
+\text{Maximize} \sum_{i=1}^{N} \sum_{j=1}^{M} (M - P_{ij})x_{ij} - \lambda \sum_{j=1}^{M} e_j - \beta \sum_{i=1}^{N} \sum_{j=1}^{M} \left( H_{ij}(\tau) + x_{ij} - \mu \right)^2
+$$

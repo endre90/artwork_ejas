@@ -1,5 +1,5 @@
 use rusqlite::{params, Connection, Result};
-use inquire::{ui::{Attributes, Color, IndexPrefix, RenderConfig, StyleSheet, Styled}, MultiSelect, Password, Select, Text};
+use inquire::{ui::{Attributes, Color, RenderConfig, StyleSheet, Styled}, MultiSelect, Password, Select, Text};
 
 // should have option to view history
 // need a help option probably
