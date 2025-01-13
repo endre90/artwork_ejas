@@ -1,0 +1,68 @@
+{
+  "stations": {
+
+    "S0": {
+      "ergo_score": {
+        "O1": 7,
+        "O2": 3,
+        "O3": 9
+      },
+      "people": [
+        {
+          "name": "A",
+          "role": "TeamLeader",
+          "competences": ["O1", "O2"],
+          "preferences": ["O1"]
+        },
+        {
+          "name": "B",
+          "role": "Operator",
+          "competences": ["O2", "O3"],
+          "preferences": ["O2"]
+        },
+        {
+          "name": "C",
+          "role": "Operator",
+          "competences": ["O1", "O3"],
+          "preferences": ["O3"]
+        }
+      ]
+    },
+    "S1": {
+      "ergo_score": {
+        "O1": 7,
+        "O2": 3,
+        "O3": 9
+      },
+      "people": [
+        {
+          "name": "A",
+          "role": "TeamLeader",
+          "competences": ["O1", "O2"],
+          "preferences": ["O1"]
+        },
+        {
+          "name": "B",
+          "role": "Operator",
+          "competences": ["O2", "O3"],
+          "preferences": ["O2"]
+        }
+      ]
+    },
+    "S2": {
+      "ergo_score": {
+        "O1": 7,
+        "O2": 3,
+        "O3": 9
+      },
+      "people": [
+        {
+          "name": "A",
+          "role": "TeamLeader",
+          "competences": ["O1", "O2"],
+          "preferences": ["O1"]
+        }
+      ]
+    }
+  }    
+}

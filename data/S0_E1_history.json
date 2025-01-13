@@ -1,0 +1,156 @@
+[
+  {
+    "day": {
+      "date": { "year": 2024, "month": 5, "day": 7 },
+      "station": "Station1",
+      "assignments": [
+        ["A", "O2"],
+        ["B", "O3"],
+        ["C", "O1"]
+      ]
+    }
+  },
+  {
+    "day": {
+      "date": { "year": 2024, "month": 5, "day": 8 },
+      "station": "Station1",
+      "assignments": [
+        ["A", "O2"],
+        ["B", "O3"],
+        ["C", "O1"]
+      ]
+    }
+  },
+  {
+    "day": {
+      "date": { "year": 2024, "month": 5, "day": 9 },
+      "station": "Station1",
+      "assignments": [
+        ["A", "O1"],
+        ["B", "O2"],
+        ["C", "O3"]
+      ]
+    }
+  },
+  {
+    "day": {
+      "date": { "year": 2024, "month": 5, "day": 10 },
+      "station": "Station1",
+      "assignments": [
+        ["A", "O2"],
+        ["B", "O3"],
+        ["C", "O1"]
+      ]
+    }
+  },
+  {
+    "day": {
+      "date": { "year": 2024, "month": 5, "day": 11 },
+      "station": "Station1",
+      "assignments": [
+        ["A", "O1"],
+        ["B", "O2"],
+        ["C", "O3"]
+      ]
+    }
+  },
+  {
+    "day": {
+      "date": { "year": 2024, "month": 5, "day": 12 },
+      "station": "Station1",
+      "assignments": [
+        ["A", "O2"],
+        ["B", "O3"],
+        ["C", "O1"]
+      ]
+    }
+  },
+  {
+    "day": {
+      "date": { "year": 2024, "month": 5, "day": 13 },
+      "station": "Station1",
+      "assignments": [
+        ["A", "O2"],
+        ["B", "O3"],
+        ["C", "O1"]
+      ]
+    }
+  },
+  {
+    "day": {
+      "date": { "year": 2024, "month": 5, "day": 14 },
+      "station": "Station1",
+      "assignments": [
+        ["A", "O1"],
+        ["B", "O2"],
+        ["C", "O3"]
+      ]
+    }
+  },
+  {
+    "day": {
+      "date": { "year": 2024, "month": 5, "day": 15 },
+      "station": "Station1",
+      "assignments": [
+        ["A", "O1"],
+        ["B", "O2"],
+        ["C", "O3"]
+      ]
+    }
+  },
+  {
+    "day": {
+      "date": { "year": 2024, "month": 5, "day": 16 },
+      "station": "Station1",
+      "assignments": [
+        ["A", "O1"],
+        ["B", "O2"],
+        ["C", "O3"]
+      ]
+    }
+  },
+  {
+    "day": {
+      "date": { "year": 2024, "month": 5, "day": 17 },
+      "station": "Station1",
+      "assignments": [
+        ["A", "O1"],
+        ["B", "O2"],
+        ["C", "O3"]
+      ]
+    }
+  },
+  {
+    "day": {
+      "date": { "year": 2024, "month": 5, "day": 18 },
+      "station": "Station1",
+      "assignments": [
+        ["A", "O2"],
+        ["B", "O3"],
+        ["C", "O1"]
+      ]
+    }
+  },
+  {
+    "day": {
+      "date": { "year": 2024, "month": 5, "day": 19 },
+      "station": "Station1",
+      "assignments": [
+        ["A", "O2"],
+        ["B", "O3"],
+        ["C", "O1"]
+      ]
+    }
+  },
+  {
+    "day": {
+      "date": { "year": 2024, "month": 5, "day": 20 },
+      "station": "Station1",
+      "assignments": [
+        ["A", "O1"],
+        ["B", "O2"],
+        ["C", "O3"]
+      ]
+    }
+  }
+]

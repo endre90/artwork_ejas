@@ -275,7 +275,7 @@ mod tests {
         let json_content = fs::read_to_string(path)?;
         let matrix: Matrix = serde_json::from_str(&json_content)?;
         if let Some(station_1) = matrix.stations.get("S0") {
-            let s = calculate_static_assignment(station_1, 10);
+            let s = calculate_static_assignment(station_1, 0);
             println!("Optimal assignment: {:?}", s.0);
             println!("Total preference score: {}", s.1);
         }

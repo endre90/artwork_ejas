@@ -25,18 +25,23 @@ pub struct Employee {
     pub preferences: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Date {
     pub year: u32,
     pub month: u8,
     pub day: u8,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Day {
     pub date: Date,
     pub station: String,
     pub assignments: Vec<(String, String)>, // (employee, job)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DayWrapper {
+    pub day: Day,
 }
 
 #[derive(Serialize, Deserialize)]

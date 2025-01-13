@@ -9,7 +9,7 @@ use z3::{
 
 use crate::*;
 
-pub fn calculate_external_assignment(
+pub fn calculate_historic_assignment(
     station: &Station,
     alpha: u32, // How strongly to discourage leader usage
     beta: u32,  // How strongly to discourage external operator usage
@@ -174,10 +174,10 @@ pub fn calculate_external_assignment(
     }
 
     // Penalty for using external employees
-    let external_penalty_sum: Int = (Int::from_i64(&ctx, beta as i64)) * e
-        .iter()
-        .map(|e_j| e_j.ite(&Int::from_i64(&ctx, 1), &Int::from_i64(&ctx, 0)))
-        .fold(Int::from_i64(&ctx, 0), |acc, x| acc + x);
+    let external_penalty_sum: Int = (Int::from_i64(&ctx, beta as i64))
+        * e.iter()
+            .map(|e_j| e_j.ite(&Int::from_i64(&ctx, 1), &Int::from_i64(&ctx, 0)))
+            .fold(Int::from_i64(&ctx, 0), |acc, x| acc + x);
 
     // Variable to track the total preference score
     let pref_score = Int::new_const(&ctx, "pref_score");
@@ -186,13 +186,13 @@ pub fn calculate_external_assignment(
     if let Some(l_i) = leader_index {
         let mut leader_penalties = Vec::new();
         for j in 0..jobs.len() {
-            let penalty_if_leader =
-                x[l_i][j].ite(&Int::from_i64(&ctx, 1), &Int::from_i64(&ctx, 0));
+            let penalty_if_leader = x[l_i][j].ite(&Int::from_i64(&ctx, 1), &Int::from_i64(&ctx, 0));
             leader_penalties.push(penalty_if_leader);
         }
-        let leader_penalty_sum = Int::from_i64(&ctx, alpha as i64) * Int::add(&ctx, &leader_penalties);
+        let leader_penalty_sum =
+            Int::from_i64(&ctx, alpha as i64) * Int::add(&ctx, &leader_penalties);
 
-        // final_objective = preference_sum - sum_of_leader_penalties - 
+        // final_objective = preference_sum - sum_of_leader_penalties -
         let final_objective_pre = Int::sub(&ctx, &[preference_sum_expr, leader_penalty_sum]);
         let final_objective = Int::sub(&ctx, &[final_objective_pre, external_penalty_sum]);
         optimizer.assert(&pref_score._eq(&final_objective));
@@ -235,7 +235,13 @@ pub fn calculate_external_assignment(
             }
 
             log::info!(target: "employee_job_assignment", "Solution found");
-            (assignment, external_assignments, pref_score as usize, c_matrix, p_matrix)
+            (
+                assignment,
+                external_assignments,
+                pref_score as usize,
+                c_matrix,
+                p_matrix,
+            )
         }
         SatResult::Unsat => {
             log::warn!(target: "employee_job_assignment", "No solution found");
@@ -301,6 +307,45 @@ fn build_preference_matrix(
     preference_matrix
 }
 
+pub fn build_historical_count_matrix(
+    history_of_assignments: Vec<Day>,
+    period: usize,
+    employees: Vec<String>,
+    jobs: Vec<String>,
+) -> Vec<Vec<u32>> {
+    // Create a mapping from employee/job names to indices
+    let employee_indices: HashMap<_, _> = employees
+        .iter()
+        .enumerate()
+        .map(|(i, name)| (name.clone(), i))
+        .collect();
+    let job_indices: HashMap<_, _> = jobs
+        .iter()
+        .enumerate()
+        .map(|(i, name)| (name.clone(), i))
+        .collect();
+
+    // Initialize the historic count matrix with zeros
+    let mut h_matrix = vec![vec![0; jobs.len()]; employees.len()];
+
+    // Iterate over the last `period` days in the history
+    let start_index = if history_of_assignments.len() > period {
+        history_of_assignments.len() - period
+    } else {
+        0
+    };
+
+    for day in &history_of_assignments[start_index..] {
+        for (employee, job) in &day.assignments {
+            if let (Some(&i), Some(&j)) = (employee_indices.get(employee), job_indices.get(job)) {
+                h_matrix[i][j] += 1;
+            }
+        }
+    }
+
+    h_matrix
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -310,18 +355,51 @@ mod tests {
 
     #[test]
     fn test_static_matrix() -> Result<(), Box<dyn std::error::Error>> {
+        let station = "S0".to_string();
+        let example = "E1".to_string();
         let manifest_dir =
             std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
-        let path = format!("{}/data/external_matrix.json", manifest_dir);
+        let matrix_path = format!("{}/data/matrix.json", manifest_dir);
+        let matrix_content = fs::read_to_string(matrix_path)?;
+        let matrix: Matrix = serde_json::from_str(&matrix_content)?;
 
-        let json_content = fs::read_to_string(path)?;
-        let matrix: Matrix = serde_json::from_str(&json_content)?;
-        if let Some(station_1) = matrix.stations.get("S0") {
-            let s = calculate_external_assignment(station_1, 0, 0);
-            println!("Optimal internal assignment: {:?}", s.0);
-            println!("Necessary external assignment: {:?}", s.1);
-            println!("Total preference score: {:?}", s.2);
+        let history_path = format!("{}/data/{}_{}_history.json", manifest_dir, station, example);
+        let history_content = fs::read_to_string(history_path)?;
+        let history_wrapper: Vec<DayWrapper> = serde_json::from_str(&history_content)?;
+        let history: Vec<Day> = history_wrapper.into_iter().map(|dw| dw.day).collect();
+
+        let mut jobs = vec![];
+        let mut employees = vec![];
+
+        if let Some(station) = matrix.stations.get(&station) {
+            for op in station
+                .ergo_score
+                .keys()
+                .map(|x| x.to_owned())
+                .collect::<Vec<String>>()
+            {
+                jobs.push(op);
+            }
+
+            for person in &station.people {
+                employees.push(person.name.clone());
+            }
         }
+
+        let h_matrix =
+            build_historical_count_matrix(history.clone(), 10, employees.clone(), jobs.clone());
+        // println!("       J  J  J  J  J");
+        println!("Historic assignment count matrix:");
+        for x in 0..h_matrix.len() {
+            println!("{}:{:?}", employees[x], h_matrix[x])
+        }
+
+        // if let Some(station_1) = matrix.stations.get("S1") {
+        //     let s = calculate_external_assignment(station_1, 100, 2);
+        //     println!("Optimal internal assignment: {:?}", s.0);
+        //     println!("Necessary external assignment: {:?}", s.1);
+        //     println!("Total preference score: {:?}", s.2);
+        // }
 
         Ok(())
     }

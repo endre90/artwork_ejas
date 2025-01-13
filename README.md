@@ -33,14 +33,6 @@ The remaining text shows the development steps of the EJAS for Artwork.
 ## Step 1: Static assignment
 The static assignment assigns $N$ employees to $M$ jobs based on their competences and preferences to maximize overall satisfaction. Each employee has a list of competences (indicating which jobs they can perform) and a ranked list of job preferences. The procedure creates binary decision variables to indicate assignments, and it aims to maximize the total preference score while ensuring each employee is assigned to at most one job, each job is covered by at most one employee, and every job is covered by at least one employee that is competent to perform it. The goal is to find an optimal static assignment that respects employees' competences and maximizes their preferences.
 
-### Objective Function
-
-Maximize the total preference score:
-
-$$
-\text{Maximize} \quad \sum_{i=1}^{N} \sum_{j=1}^{M} (M - P_{ij}) \cdot x_{ij} - \alpha \sum_{j=1}^{M} x_{kj} 
-$$
-
 ### Notation
 
 - $N$: Number of employees
@@ -48,7 +40,7 @@ $$
 - $x_{ij}$: Binary decision vaiable representing operator $i$ performing job $j$
 - $C_{ij}$: Binary competence matrix where $C_{ij} = 1$ if employee $i$ can perform job $j$, and $C_{ij} = 0$ otherwise
 - $P_{ij}$: Preference rank matrix where $P_{ij}$ is the preference rank of job $j$ for employee $i$. Lower values (taken as index) in $P_{ij}$ indicate higher preference
-- $k$: Index of a team leader, if a team leader exists.
+- $k$: Index of a team leader, if it exists.
 - $\alpha$: How strongly to discourage the use of a team leader. The team leader is allocating operators and doing other work, so performing operations 
 should only be done when there is not enough competent operators in the station. 
 
@@ -62,6 +54,14 @@ x_{ij} =
 1 & \text{if employee } i \text{ is assigned to job } j \\ 
 0 & \text{otherwise} 
 \end{cases}
+$$
+
+### Objective Function
+
+Maximize the total preference score:
+
+$$
+\text{Maximize} \quad \sum_{i=1}^{N} \sum_{j=1}^{M} (M - P_{ij}) \cdot x_{ij} - \alpha \sum_{j=1}^{M} x_{kj} 
 $$
 
 ### Constraints
@@ -96,11 +96,16 @@ In this step, the static assignment problem is extended with the possibility to 
 
 ### Notation
 
-- $N$: 
-Number of employees.
-- $M$: Number of jobs.
-- $C_{ij}$: Binary competence matrix where $C_{ij} = 1$ if employee $i$ can perform job $j$, and $C_{ij} = 0$ otherwise.
-- $P_{ij}$: Preference rank matrix where $P_{ij}$ is the preference rank of job $j$ for employee $i$. Lower values in $P_{ij}$ indicate higher preference.
+- $N$: Number of employees
+- $M$: Number of jobs
+- $x_{ij}$: Binary decision vaiable representing operator $i$ performing job $j$
+- $C_{ij}$: Binary competence matrix where $C_{ij} = 1$ if employee $i$ can perform job $j$, and $C_{ij} = 0$ otherwise
+- $P_{ij}$: Preference rank matrix where $P_{ij}$ is the preference rank of job $j$ for employee $i$. Lower values (taken as index) in $P_{ij}$ indicate higher preference
+- $k$: Index of a team leader, if it exists.
+- $\alpha$: How strongly to discourage the use of a team leader. The team leader is allocating operators and doing other work, so performing operations 
+should only be done when there is not enough competent operators in the station. 
+- $\beta$: How strongly to discourage the use of external employees. If there is not enough external employees in the station, external employees are called in to complete the jobs.
+- NOTE: As a general rule, if the team leader is competent to perform an operation for which a competence doesn't exist, or there are not enough employees, the team leader should always perform the job before calling in external employees. This can be tweaked by changing the $\alpha$ and $\beta$ weights.
 
 ### Decision Variables
 
@@ -129,10 +134,10 @@ $$
 Maximize the total preference score while minimizing the use of external employees:
 
 $$
-\text{Maximize} \quad \sum_{i=1}^{N} \sum_{j=1}^{M} (M - P_{ij}) \cdot x_{ij} - \lambda \sum_{j=1}^{M} e_j
+\text{Maximize} \quad \sum_{i=1}^{N} \sum_{j=1}^{M} (M - P_{ij}) \cdot x_{ij} - \alpha \sum_{j=1}^{M} x_{kj} - \beta \sum_{j=1}^{M} e_j
 $$
 
-where $\lambda$ is a penalty factor for using external employees.
+where $\beta$ is a penalty factor for using external employees.
 
 ### Constraints
 

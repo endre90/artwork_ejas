@@ -9,6 +9,12 @@
       },
       "people": [
         {
+          "name": "A",
+          "role": "TeamLeader",
+          "competences": ["O1", "O2"],
+          "preferences": ["O1"]
+        },
+        {
           "name": "B",
           "role": "Operator",
           "competences": ["O2", "O3"],
