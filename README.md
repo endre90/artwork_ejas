@@ -283,12 +283,23 @@ This model ensures that employees are fairly assigned a job for the current day,
 
 ### Notation
 
-- $N$: Number of internal employees.
-- $M$: Number of jobs.
-- $\tau$: Number of days to consider in the historical data.
-- $C_{ij}$: Binary competence matrix where $C_{ij} = 1$ if worker $i$ can perform job $j$, and $C_{ij} = 0$ otherwise.
-- $P_{ij}$: Preference rank matrix where $P_{ij}$ is the preference rank of job $j$ for worker $i$. Lower values in $P_{ij}$ indicate higher preference.
+- $N$: Number of employees
+- $M$: Number of jobs
+- $x_{ij}$: Binary decision vaiable representing operator $i$ performing job $j$
+- $C_{ij}$: Binary competence matrix where $C_{ij} = 1$ if employee $i$ can perform job $j$, and $C_{ij} = 0$ otherwise
+- $P_{ij}$: Preference rank matrix where $P_{ij}$ is the preference rank of job $j$ for employee $i$. Lower values (taken as index) in $P_{ij}$ indicate higher preference
+- $k$: Index of a team leader, if it exists.
+- $\alpha$: How strongly to discourage the use of a team leader. The team leader is allocating operators and doing other work, so performing operations 
+should only be done when there is not enough competent operators in the station. 
+- $\beta$: How strongly to discourage the use of external employees. If there is not enough external employees in the station, external employees are called in to complete the jobs.
+- $\tau$: Number of days to consider in the historical data (from last day to last day - $\tau$).
+- $\gamma$: A weight controlling how strongly to penalize assigning the same employee–job pair that was frequently assigned in the past $\tau$ days.
+- $\sigma$: Optional assignment threshold, only necessary if there is an absolute limit (e.g., ergonomic score or union rules).
 - $H_{ij}(\tau)$: Historical count matrix where $H_{ij}(\tau)$ is the number of times worker $i$ has performed job $j$ in the past $\tau$ days.
+- NOTE: As a general rule, if the team leader is competent to perform an operation for which a competence doesn't exist, or there are not enough employees, the team leader should always perform the job before calling in external employees. This can be tweaked by changing the $\alpha$ and $\beta$ weights.
+
+### Decision Variables
+
 - $x_{ij}$: Binary decision variable such that:
 
 $$
@@ -339,10 +350,10 @@ $$
 \sum_{i=1}^{N} C_{ij} \cdot x_{ij} + e_j \geq 1 \quad \forall j \in \{1, \ldots, M\}
 $$
 
-5. Limit the maximum number of assignments (including historical data):
+5. OPTIONAL: Strictly limit the maximum number of assignments (but this is a hard constraint rather than a fairness preference. Usually, this is only necessary if there is an absolute limit (e.g., ergonomic score or union rules)):
 
 $$
-H_{ij}(\tau) + x_{ij} \leq \alpha \quad \forall i \in \{1, \ldots, N\}, \forall j \in \{1, \ldots, M\}
+H_{ij}(\tau) + x_{ij} \leq \sigma \quad \forall i \in \{1, \ldots, N\}, \forall j \in \{1, \ldots, M\}
 $$
 
 ### Objective Function
@@ -350,11 +361,21 @@ $$
 The objective function can be expressed as:
 
 $$
-\text{Maximize} \sum_{i=1}^{N} \sum_{j=1}^{M} P_{ij} x_{ij} - \lambda \sum_{j=1}^{M} e_j - \beta \sum_{i=1}^{N} \sum_{j=1}^{M} \left( H_{ij}(\tau) + x_{ij} - \mu \right)^2
+\text{Maximize} 
+\sum_{i=1}^{N} \sum_{j=1}^{M} \bigl(M - P_{i,j}\bigr)\,x_{ij}
+\;-\;
+\alpha \sum_{j=1}^{M} x_{kj}
+\;-\;
+\beta \sum_{j=1}^{M} e_{j}
+\;-\;
+\gamma \sum_{i=1}^{N} \sum_{j=1}^{M} H_{i,j}(\tau)\, x_{ij}.
 $$
 
-OR ???:
+Where:
 
-$$
-\text{Maximize} \sum_{i=1}^{N} \sum_{j=1}^{M} (M - P_{ij})x_{ij} - \lambda \sum_{j=1}^{M} e_j - \beta \sum_{i=1}^{N} \sum_{j=1}^{M} \left( H_{ij}(\tau) + x_{ij} - \mu \right)^2
-$$
+
+- $ \sum_{i=1}^{N} \sum_{j=1}^{M} (M - P_{ij}) \, x_{ij}$ maximizes total preference, since a lower preference rank $ P_{ij} $ yields a higher $ (M - P_{ij}) $.  
+- $ \alpha \sum_{j=1}^{M} x_{k,j} $ penalizes using the team leader (employee \(k\)).  
+- $ \beta \sum_{j=1}^{M} e_{j} $ penalizes using external employees.  
+- $ \gamma \sum_{i=1}^{N} \sum_{j=1}^{M} H_{ij}(\tau)\, x_{ij} $ adds a fainess penalty for assigning a job $j$ to an employee $i$ who has in the last $\tau$ days done that job many times, promoting a more balanced distribution of tasks.
+

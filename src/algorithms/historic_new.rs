@@ -11,8 +11,11 @@ use crate::*;
 
 pub fn calculate_historic_assignment(
     station: &Station,
+    history: Vec<Day>,
     alpha: u32, // How strongly to discourage leader usage
     beta: u32,  // How strongly to discourage external operator usage
+    tau: u32, // Number of days to consider in the historical data (from last day to last day - tau)
+    gamma: u32, // how strongly to penalize assigning the same employee–job pair that was frequently assigned in the past tau days
 ) -> (
     Vec<(String, String)>,
     Vec<String>,
@@ -179,6 +182,22 @@ pub fn calculate_historic_assignment(
             .map(|e_j| e_j.ite(&Int::from_i64(&ctx, 1), &Int::from_i64(&ctx, 0)))
             .fold(Int::from_i64(&ctx, 0), |acc, x| acc + x);
 
+    // Penalty for assigning assigning the same employee–job pair that was frequently assigned in the past $\tau$ days
+    let h_matrix = build_historical_count_matrix(history, tau as usize, &employees, &jobs);
+    let mut h_fairness_terms = Vec::new();
+    for i in 0..employees.len() {
+        for j in 0..jobs.len() {
+            let hist_count = h_matrix[i][j] as i64;
+            let penalty_expr = x[i][j].ite(
+                &z3::ast::Int::from_i64(&ctx, hist_count),
+                &z3::ast::Int::from_i64(&ctx, 0),
+            );
+            h_fairness_terms.push(penalty_expr);
+        }
+    }
+    let sum_of_h_fairness = z3::ast::Int::add(&ctx, &h_fairness_terms);
+    let h_fairness_penalty_sum = z3::ast::Int::from_i64(&ctx, gamma as i64) * sum_of_h_fairness;
+
     // Variable to track the total preference score
     let pref_score = Int::new_const(&ctx, "pref_score");
 
@@ -192,14 +211,15 @@ pub fn calculate_historic_assignment(
         let leader_penalty_sum =
             Int::from_i64(&ctx, alpha as i64) * Int::add(&ctx, &leader_penalties);
 
-        // final_objective = preference_sum - sum_of_leader_penalties -
-        let final_objective_pre = Int::sub(&ctx, &[preference_sum_expr, leader_penalty_sum]);
-        let final_objective = Int::sub(&ctx, &[final_objective_pre, external_penalty_sum]);
+        let final_objective = Int::sub(&ctx, &[preference_sum_expr, leader_penalty_sum]);
+        let final_objective = Int::sub(&ctx, &[final_objective, external_penalty_sum]);
+        let final_objective = Int::sub(&ctx, &[final_objective, h_fairness_penalty_sum]);
         optimizer.assert(&pref_score._eq(&final_objective));
         optimizer.maximize(&final_objective);
     } else {
         // If no leader, just use the original preference sum
         let final_objective = Int::sub(&ctx, &[preference_sum_expr, external_penalty_sum]);
+        let final_objective = Int::sub(&ctx, &[final_objective, h_fairness_penalty_sum]);
         optimizer.assert(&pref_score._eq(&final_objective));
         optimizer.maximize(&final_objective);
     }
@@ -307,38 +327,69 @@ fn build_preference_matrix(
     preference_matrix
 }
 
+// pub fn build_historical_count_matrix(
+//     history_of_assignments: Vec<Day>,
+//     period: usize,
+//     employees: &Vec<String>,
+//     jobs: &Vec<String>,
+// ) -> Vec<Vec<u32>> {
+//     // Create a mapping from employee/job names to indices
+//     let employee_indices: HashMap<_, _> = employees
+//         .iter()
+//         .enumerate()
+//         .map(|(i, name)| (name.clone(), i))
+//         .collect();
+//     let job_indices: HashMap<_, _> = jobs
+//         .iter()
+//         .enumerate()
+//         .map(|(i, name)| (name.clone(), i))
+//         .collect();
+
+//     // Initialize the historic count matrix with zeros
+//     let mut h_matrix = vec![vec![0; jobs.len()]; employees.len()];
+
+//     // Iterate over the last `period` days in the history
+//     let start_index = if history_of_assignments.len() > period {
+//         history_of_assignments.len() - period
+//     } else {
+//         0
+//     };
+
+//     for day in &history_of_assignments[start_index..] {
+//         for (employee, job) in &day.assignments {
+//             if let (Some(&i), Some(&j)) = (employee_indices.get(employee), job_indices.get(job)) {
+//                 h_matrix[i][j] += 1;
+//             }
+//         }
+//     }
+
+//     h_matrix
+// }
+
 pub fn build_historical_count_matrix(
     history_of_assignments: Vec<Day>,
     period: usize,
-    employees: Vec<String>,
-    jobs: Vec<String>,
+    employees: &Vec<String>,
+    jobs: &Vec<String>,
 ) -> Vec<Vec<u32>> {
-    // Create a mapping from employee/job names to indices
-    let employee_indices: HashMap<_, _> = employees
-        .iter()
-        .enumerate()
-        .map(|(i, name)| (name.clone(), i))
-        .collect();
-    let job_indices: HashMap<_, _> = jobs
-        .iter()
-        .enumerate()
-        .map(|(i, name)| (name.clone(), i))
-        .collect();
-
     // Initialize the historic count matrix with zeros
     let mut h_matrix = vec![vec![0; jobs.len()]; employees.len()];
 
-    // Iterate over the last `period` days in the history
-    let start_index = if history_of_assignments.len() > period {
-        history_of_assignments.len() - period
-    } else {
-        0
-    };
+    // Calculate how far back we go
+    let start_index = history_of_assignments.len().saturating_sub(period);
 
+    // For each day in the specified slice
     for day in &history_of_assignments[start_index..] {
+        // `day.assignments` is already a Vec<(String, String)>
+        // so iteration order is the insertion order in that vector.
         for (employee, job) in &day.assignments {
-            if let (Some(&i), Some(&j)) = (employee_indices.get(employee), job_indices.get(job)) {
-                h_matrix[i][j] += 1;
+            // 1) Find the index of the employee in `employees`
+            if let Some(i) = employees.iter().position(|e| e == employee) {
+                // 2) Find the index of the job in `jobs`
+                if let Some(j_pos) = jobs.iter().position(|job_name| job_name == job) {
+                    // 3) Increment the counter
+                    h_matrix[i][j_pos] += 1;
+                }
             }
         }
     }
@@ -359,7 +410,7 @@ mod tests {
         let example = "E1".to_string();
         let manifest_dir =
             std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
-        let matrix_path = format!("{}/data/matrix.json", manifest_dir);
+        let matrix_path = format!("{}/data/{}_matrix.json", manifest_dir, station);
         let matrix_content = fs::read_to_string(matrix_path)?;
         let matrix: Matrix = serde_json::from_str(&matrix_content)?;
 
@@ -372,12 +423,13 @@ mod tests {
         let mut employees = vec![];
 
         if let Some(station) = matrix.stations.get(&station) {
-            for op in station
+            let mut sorted = station
                 .ergo_score
                 .keys()
                 .map(|x| x.to_owned())
-                .collect::<Vec<String>>()
-            {
+                .collect::<Vec<String>>();
+            sorted.sort();
+            for op in sorted {
                 jobs.push(op);
             }
 
@@ -386,20 +438,19 @@ mod tests {
             }
         }
 
-        let h_matrix =
-            build_historical_count_matrix(history.clone(), 10, employees.clone(), jobs.clone());
+        let h_matrix = build_historical_count_matrix(history.clone(), 10, &employees, &jobs);
         // println!("       J  J  J  J  J");
         println!("Historic assignment count matrix:");
         for x in 0..h_matrix.len() {
             println!("{}:{:?}", employees[x], h_matrix[x])
         }
 
-        // if let Some(station_1) = matrix.stations.get("S1") {
-        //     let s = calculate_external_assignment(station_1, 100, 2);
-        //     println!("Optimal internal assignment: {:?}", s.0);
-        //     println!("Necessary external assignment: {:?}", s.1);
-        //     println!("Total preference score: {:?}", s.2);
-        // }
+        if let Some(station_1) = matrix.stations.get("S0") {
+            let s = calculate_historic_assignment(station_1, history, 0, 500, 10, 0);
+            println!("Optimal internal assignment: {:?}", s.0);
+            println!("Necessary external assignment: {:?}", s.1);
+            println!("Total preference score: {:?}", s.2);
+        }
 
         Ok(())
     }
