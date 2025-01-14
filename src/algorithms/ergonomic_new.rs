@@ -9,7 +9,7 @@ use z3::{
 
 use crate::*;
 
-pub fn calculate_historic_assignment(
+pub fn calculate_ergonomic_assignment(
     station: &Station,
     history: Vec<Day>,
     alpha: u32, // How strongly to discourage leader usage
@@ -366,7 +366,7 @@ fn build_preference_matrix(
 //     h_matrix
 // }
 
-pub fn build_historical_count_matrix(
+pub fn build_historical_count_matrix_2(
     history_of_assignments: Vec<Day>,
     period: usize,
     employees: &Vec<String>,
@@ -438,7 +438,7 @@ mod tests {
             }
         }
 
-        let h_matrix = build_historical_count_matrix(history.clone(), 10, &employees, &jobs);
+        let h_matrix = build_historical_count_matrix_2(history.clone(), 10, &employees, &jobs);
         // println!("       J  J  J  J  J");
         println!("Historic assignment count matrix:");
         for x in 0..h_matrix.len() {
