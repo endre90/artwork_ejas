@@ -354,26 +354,26 @@ The objective function can be expressed as:
 
 $$
 \text{Maximize} 
-\sum_{i=1}^{N} \sum_{j=1}^{M} \bigl(M - P_{i,j}\bigr)\,x_{ij}
-\;-\;
+\sum_{i=1}^{N} \sum_{j=1}^{M} \bigl(M - P_{ij}\bigr) x_{ij}
+-
 \alpha \sum_{j=1}^{M} x_{kj}
-\;-\;
+-
 \beta \sum_{j=1}^{M} e_{j}
-\;-\;
-\gamma \sum_{i=1}^{N} \sum_{j=1}^{M} H_{ij}(\tau)\, x_{ij}
-\;+\;
-\delta \sum_{i=1}^{N} \sum_{j=1}^{M} E^\mathrm{eff}_{ij}(\tau)\, x_{ij}
+-
+\gamma \sum_{i=1}^{N} \sum_{j=1}^{M} H_{ij}(\tau) x_{ij}
++
+\delta \sum_{i=1}^{N} \sum_{j=1}^{M} E^\mathrm{eff}_{ij}(\tau) x_{ij}
 % E^\mathrm{eff}_{i,j}(\tau) = \frac{E_{j}}{\,1 \;+\; \theta \,H_{i,j}(\tau)\,}$
 $$
 
 Where:
 
 
-- $ \sum_{i=1}^{N} \sum_{j=1}^{M} (M - P_{ij}) \, x_{ij}$ maximizes total preference, since a lower preference rank $ P_{ij} $ yields a higher $ (M - P_{ij}) $.  
-- $ \alpha \sum_{j=1}^{M} x_{k,j} $ penalizes using the team leader (employee \(k\)).  
+- $ \sum_{i=1}^{N} \sum_{j=1}^{M} (M - P_{ij}) x_{ij}$ maximizes total preference, since a lower preference rank $ P_{ij} $ yields a higher $ (M - P_{ij}) $.  
+- $ \alpha \sum_{j=1}^{M} x_{kj} $ penalizes using the team leader (employee \(k\)).  
 - $ \beta \sum_{j=1}^{M} e_{j} $ penalizes using external employees.  
-- $ \gamma \sum_{i=1}^{N} \sum_{j=1}^{M} H_{ij}(\tau)\, x_{ij} $ adds a fainess penalty for assigning a job $j$ to an employee $i$ who has in the last $\tau$ days done that job many times, promoting a more balanced distribution of tasks.
-- $ E^\mathrm{eff}_{i,j}(\tau) = \frac{E_{j}}{\,1 \;+\; \theta \,H_{i,j}(\tau)\,}$
+- $ \gamma \sum_{i=1}^{N} \sum_{j=1}^{M} H_{ij}(\tau) x_{ij} $ adds a fainess penalty for assigning a job $j$ to an employee $i$ who has in the last $\tau$ days done that job many times, promoting a more balanced distribution of tasks.
+- $ E^\mathrm{eff}_{ij}(\tau) = \frac{E_{j}}{1 + \theta H_{ij}(\tau)} $
 
 **How the Ergonomics Works**
 
