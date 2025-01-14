@@ -353,17 +353,16 @@ $$
 The objective function can be expressed as:
 
 $$
-\text{Maximize} 
+\text{Maximize} \quad
 \sum_{i=1}^{N} \sum_{j=1}^{M} \bigl(M - P_{ij}\bigr) x_{ij}
--
+\;-\;
 \alpha \sum_{j=1}^{M} x_{kj}
--
+\;-\;
 \beta \sum_{j=1}^{M} e_{j}
--
+\;-\;
 \gamma \sum_{i=1}^{N} \sum_{j=1}^{M} H_{ij}(\tau) x_{ij}
-+
-\delta \sum_{i=1}^{N} \sum_{j=1}^{M} E^\mathrm{eff}_{ij}(\tau) x_{ij}
-% E^\mathrm{eff}_{i,j}(\tau) = \frac{E_{j}}{\,1 \;+\; \theta \,H_{i,j}(\tau)\,}$
+\;+\;
+\delta \sum_{i=1}^{N} \sum_{j=1}^{M} E^\mathrm{eff}_{ij}(\tau) x_{ij}.
 $$
 
 Where:
