@@ -12,10 +12,13 @@ use crate::*;
 pub fn calculate_ergonomic_assignment(
     station: &Station,
     history: Vec<Day>,
+    offset: u32,
+    omega: u32, // How strongly preference considerations influence the objective function
     alpha: u32, // How strongly to discourage leader usage
     beta: u32,  // How strongly to discourage external operator usage
     tau: u32, // Number of days to consider in the historical data (from last day to last day - tau)
     gamma: u32, // how strongly to penalize assigning the same employee–job pair that was frequently assigned in the past tau days
+    delta: u32, // Ergonomics weight
 ) -> (
     Vec<(String, String)>,
     Vec<String>,
@@ -162,7 +165,7 @@ pub fn calculate_ergonomic_assignment(
         .collect();
 
     // Create an Int expression that sums up all preference contributions
-    let preference_sum_expr = Int::add(&ctx, &preference_score_sum);
+    let preference_sum_expr = Int::from_i64(&ctx, omega as i64) * Int::add(&ctx, &preference_score_sum);
 
     // Find a leader index
     let mut leader_index: Option<usize> = None;
@@ -201,6 +204,57 @@ pub fn calculate_ergonomic_assignment(
     // Variable to track the total preference score
     let pref_score = Int::new_const(&ctx, "pref_score");
 
+    // Build the ergonomic scores for jobs
+    let ergo_scores: Vec<i32> = jobs
+        .iter()
+        .map(|job| station.ergo_score.get(job).copied().unwrap_or(1) as i32) // Default to 1 if not found
+        .collect();
+
+    // Compute the effective ergonomics matrix
+    let theta = 1; // For now should be good enough
+    let e_eff_matrix: Vec<Vec<(i32, i32)>> = h_matrix
+        .iter()
+        .enumerate()
+        .map(|(i, row)| {
+            row.iter()
+                .enumerate()
+                .map(|(j, &h_ij)| {
+                    let e_j = ergo_scores[j];
+                    (e_j, (1 + theta * h_ij) as i32) // Compute E_eff
+                })
+                .collect()
+        })
+        .collect();
+
+    // // Ergonomic reward terms: correct but cant implement borrow
+    // let mut ergonomic_terms = Vec::new();
+    // for i in 0..employees.len() {
+    //     for j in 0..jobs.len() {
+    //         let e_eff = e_eff_matrix[i][j];
+    //         let ergonomic_reward = x[i][j].ite(
+    //             &z3::ast::Real::from_real(&ctx, e_eff.0, e_eff.1),
+    //             &z3::ast::Real::from_real(&ctx, 0, 1),
+    //         );
+    //         ergonomic_terms.push(ergonomic_reward);
+    //     }
+    // }
+
+    // Ergonomic reward terms
+    let mut ergonomic_terms = Vec::new();
+    for i in 0..employees.len() {
+        for j in 0..jobs.len() {
+            let e_eff = e_eff_matrix[i][j];
+            let ergonomic_reward = x[i][j].ite(
+                &z3::ast::Int::from_i64(&ctx, (e_eff.0 as f64 / e_eff.1 as f64).round() as i64),
+                &z3::ast::Int::from_i64(&ctx, 0),
+            );
+            ergonomic_terms.push(ergonomic_reward);
+        }
+    }
+
+    // Total ergonomic reward
+    let ergonomic_reward_sum = z3::ast::Int::add(&ctx, &ergonomic_terms);
+
     // Build objective that includes a penalty if the leader is assigned
     if let Some(l_i) = leader_index {
         let mut leader_penalties = Vec::new();
@@ -214,12 +268,16 @@ pub fn calculate_ergonomic_assignment(
         let final_objective = Int::sub(&ctx, &[preference_sum_expr, leader_penalty_sum]);
         let final_objective = Int::sub(&ctx, &[final_objective, external_penalty_sum]);
         let final_objective = Int::sub(&ctx, &[final_objective, h_fairness_penalty_sum]);
+        let final_objective = Int::add(&ctx, &[final_objective, ergonomic_reward_sum]);
+        let final_objective = Int::add(&ctx, &[final_objective, Int::from_i64(&ctx, offset as i64)]);
         optimizer.assert(&pref_score._eq(&final_objective));
         optimizer.maximize(&final_objective);
     } else {
         // If no leader, just use the original preference sum
         let final_objective = Int::sub(&ctx, &[preference_sum_expr, external_penalty_sum]);
         let final_objective = Int::sub(&ctx, &[final_objective, h_fairness_penalty_sum]);
+        let final_objective = Int::add(&ctx, &[final_objective, ergonomic_reward_sum]);
+        let final_objective = Int::add(&ctx, &[final_objective, Int::from_i64(&ctx, offset as i64)]);
         optimizer.assert(&pref_score._eq(&final_objective));
         optimizer.maximize(&final_objective);
     }
@@ -327,45 +385,6 @@ fn build_preference_matrix(
     preference_matrix
 }
 
-// pub fn build_historical_count_matrix(
-//     history_of_assignments: Vec<Day>,
-//     period: usize,
-//     employees: &Vec<String>,
-//     jobs: &Vec<String>,
-// ) -> Vec<Vec<u32>> {
-//     // Create a mapping from employee/job names to indices
-//     let employee_indices: HashMap<_, _> = employees
-//         .iter()
-//         .enumerate()
-//         .map(|(i, name)| (name.clone(), i))
-//         .collect();
-//     let job_indices: HashMap<_, _> = jobs
-//         .iter()
-//         .enumerate()
-//         .map(|(i, name)| (name.clone(), i))
-//         .collect();
-
-//     // Initialize the historic count matrix with zeros
-//     let mut h_matrix = vec![vec![0; jobs.len()]; employees.len()];
-
-//     // Iterate over the last `period` days in the history
-//     let start_index = if history_of_assignments.len() > period {
-//         history_of_assignments.len() - period
-//     } else {
-//         0
-//     };
-
-//     for day in &history_of_assignments[start_index..] {
-//         for (employee, job) in &day.assignments {
-//             if let (Some(&i), Some(&j)) = (employee_indices.get(employee), job_indices.get(job)) {
-//                 h_matrix[i][j] += 1;
-//             }
-//         }
-//     }
-
-//     h_matrix
-// }
-
 pub fn build_historical_count_matrix_2(
     history_of_assignments: Vec<Day>,
     period: usize,
@@ -446,7 +465,7 @@ mod tests {
         }
 
         if let Some(station_1) = matrix.stations.get("S0") {
-            let s = calculate_historic_assignment(station_1, history, 0, 500, 10, 0);
+            let s = calculate_ergonomic_assignment(station_1, history, 1000, 1, 1, 1, 1, 1, 1);
             println!("Optimal internal assignment: {:?}", s.0);
             println!("Necessary external assignment: {:?}", s.1);
             println!("Total preference score: {:?}", s.2);
