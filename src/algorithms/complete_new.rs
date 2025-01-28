@@ -6,17 +6,20 @@ use z3::{
 
 use crate::*;
 
-pub fn calculate_ergonomic_assignment(
+pub fn calculate_complete_assignment(
     station: &Station,
     history: Vec<Day>,
-    offset: u32,
-    omega: u32, // How strongly preference considerations influence the objective function
-    alpha: u32, // How strongly to discourage leader usage
-    beta: u32,  // How strongly to discourage external operator usage
+    horizon: u32, // For how many days to plan ahead (the planning horizon (1 means only assignment for today))
+    offset: u32,  // Add to objective to get a positive integer result (just for aesthetics)
+    omega: u32,   // How strongly preference considerations influence the objective function
+    alpha: u32,   // How strongly to discourage leader usage
+    beta: u32,    // How strongly to discourage external operator usage
     tau: u32, // Number of days to consider in the historical data (from last day to last day - tau)
     gamma: u32, // how strongly to penalize assigning the same employee–job pair that was frequently assigned in the past tau days
     delta: u32, // Ergonomics weight
-    theta: u32,
+    theta: u32, // Weight controlling how the historical count reduces the ergonomics benefit of a job for a given employee.
+                // A higher theta means historical assignment counts erode the ergonomics score more severely,
+                // thereby discouraging repeated allocations of the same job to a single employee from an ergonomics standpoint
 ) -> (
     Vec<(String, String)>,
     Vec<String>,
@@ -51,88 +54,110 @@ pub fn calculate_ergonomic_assignment(
     let ctx = Context::new(&cfg);
     let optimizer = Optimize::new(&ctx);
 
-    // Create boolean variables for assignments
-    let x: Vec<Vec<Bool>> = (0..employees.len())
+    let x: Vec<Vec<Vec<Bool>>> = (0..employees.len())
         .map(|i| {
             (0..jobs.len())
-                .map(|j| Bool::new_const(&ctx, format!("x_{}_{}", i, j)))
+                .map(|j| {
+                    (0..horizon)
+                        .map(|t| Bool::new_const(&ctx, format!("x_{}_{}_{}", i, j, t)))
+                        .collect()
+                })
                 .collect()
         })
         .collect();
 
     // Create boolean variables for external assignments
-    let e: Vec<Bool> = (0..jobs.len())
-        .map(|j| Bool::new_const(&ctx, format!("e_{}", j)))
+    let e: Vec<Vec<Bool>> = (0..jobs.len())
+        .map(|j| {
+            (0..horizon)
+                .map(|t| Bool::new_const(&ctx, format!("e_{}_{}", j, t)))
+                .collect()
+        })
         .collect();
 
-    // Constraints: Each employee is assigned at most one job
+    // Constraints: Each employee is assigned at most one job per day
     for i in 0..employees.len() {
-        let employee_constraints: Vec<_> = (0..jobs.len()).map(|j| x[i][j].clone()).collect();
-        let at_most_one_job_per_employee = ast::Bool::pb_le(
-            &ctx,
-            employee_constraints
-                .iter()
-                .map(|x| (x, 1))
-                .collect::<Vec<(&ast::Bool, i32)>>()
-                .as_slice(),
-            1,
-        );
+        for t in 0..horizon as usize {
+            let employee_day_constraints: Vec<_> =
+                (0..jobs.len()).map(|j| x[i][j][t].clone()).collect();
 
-        optimizer.assert(&at_most_one_job_per_employee);
-    }
+            let at_most_one_job_per_employee_per_day = ast::Bool::pb_le(
+                &ctx,
+                &employee_day_constraints
+                    .iter()
+                    .map(|x| (x, 1))
+                    .collect::<Vec<(&ast::Bool, i32)>>()
+                    .as_slice(),
+                1,
+            );
 
-    // Constraints: Each job is assigned exactry to either one internal employee or one external employee
-    for j in 0..jobs.len() {
-        let job_constraints: Vec<_> = (0..employees.len()).map(|i| x[i][j].clone()).collect();
-        let at_most_one_employee_per_job = ast::Bool::pb_eq(
-            &ctx,
-            vec![e[j].clone()]
-                .into_iter()
-                .chain(job_constraints.into_iter())
-                .collect::<Vec<_>>()
-                .iter()
-                .map(|x| (x, 1))
-                .collect::<Vec<(&ast::Bool, i32)>>()
-                .as_slice(),
-            1,
-        );
-
-        optimizer.assert(&at_most_one_employee_per_job);
-    }
-
-    // Constraints: Each job must be covered by at least one competent worker or one external worker
-    let mut coverage_per_job: Vec<Vec<ast::Bool>> = vec![Vec::new(); jobs.len()];
-
-    for i in 0..employees.len() {
-        for j in 0..jobs.len() {
-            if c_matrix[i][j] {
-                coverage_per_job[j].push(x[i][j].clone());
-            }
+            optimizer.assert(&at_most_one_job_per_employee_per_day);
         }
     }
 
+    // Constraints: Each job is assigned exactly to either one internal employee or one external employee per day
     for j in 0..jobs.len() {
-        coverage_per_job[j].push(e[j].clone()); // Add the external worker option
-        let job_covered = ast::Bool::pb_ge(
-            &ctx,
-            coverage_per_job[j]
-                .iter()
-                .map(|b| (b, 1))
-                .collect::<Vec<(&ast::Bool, i32)>>()
-                .as_slice(),
-            1,
-        );
+        for t in 0..horizon as usize {
+            let mut job_constraints = vec![];
+            job_constraints.push(e[j][t]);
+            for i in 0..employees.len() {
+                job_constraints.push(x[i][j][t].clone());
+            }
 
-        optimizer.assert(&job_covered);
+            let exactly_one_employee_per_job = ast::Bool::pb_eq(
+                &ctx,
+                job_constraints
+                    .iter()
+                    .map(|x| (x, 1))
+                    .collect::<Vec<(&ast::Bool, i32)>>()
+                    .as_slice(),
+                1,
+            );
+
+            optimizer.assert(&exactly_one_employee_per_job);
+        }
+    }
+
+    // Constraints: Each job must be covered by at least one competent worker or one external worker per day
+    for j in 0..jobs.len() {
+        for t in 0..horizon {
+            let mut coverage_per_job_day: Vec<ast::Bool> = Vec::new();
+
+            // Add competent internal workers for job j on day t
+            for i in 0..employees.len() {
+                if c_matrix[i][j] {
+                    coverage_per_job_day.push(x[i][j][t].clone());
+                }
+            }
+
+            // Add external worker option for job j on day t
+            coverage_per_job_day.push(e[j][t].clone());
+
+            // Create the coverage constraint: sum >= 1
+            let job_covered = ast::Bool::pb_ge(
+                &ctx,
+                coverage_per_job_day
+                    .iter()
+                    .map(|b| (b, 1))
+                    .collect::<Vec<(&ast::Bool, i32)>>()
+                    .as_slice(),
+                1,
+            );
+
+            // Assert the constraint in the optimizer
+            optimizer.assert(&job_covered);
+        }
     }
 
     // Constraints: Only assign jobs to employees are competent to perform them
     for i in 0..employees.len() {
         for j in 0..jobs.len() {
-            optimizer.assert(&Bool::implies(
-                &x[i][j],
-                &Bool::from_bool(&ctx, c_matrix[i][j]),
-            ));
+            for t in 0..horizon as usize {
+                optimizer.assert(&Bool::implies(
+                    &x[i][j][t],
+                    &Bool::from_bool(&ctx, c_matrix[i][j]),
+                ));
+            }
         }
     }
 
@@ -142,13 +167,15 @@ pub fn calculate_ergonomic_assignment(
         for j in 0..jobs.len() {
             let rank = p_matrix[i][j];
             let score = (jobs.len() - rank) as i32;
-            preference_score.push((
-                Bool::and(
-                    &ctx,
-                    vec![&x[i][j], &Bool::from_bool(&ctx, true)].as_slice(),
-                ),
-                score,
-            ));
+            for t in 0..horizon as usize {
+                preference_score.push((
+                    Bool::and(
+                        &ctx,
+                        vec![&x[i][j][t], &Bool::from_bool(&ctx, true)].as_slice(),
+                    ),
+                    score,
+                ));
+            }
         }
     }
 
@@ -383,18 +410,7 @@ mod tests {
         }
 
         if let Some(station_1) = matrix.stations.get("S0") {
-            let s = calculate_ergonomic_assignment(
-                station_1, 
-                history, 
-                1000, 
-                0, 
-                1, 
-                2, 
-                0, 
-                0, 
-                0,
-                0
-            );
+            let s = calculate_ergonomic_assignment(station_1, history, 1000, 0, 1, 2, 0, 0, 0, 0);
             println!("Optimal internal assignment: {:?}", s.0);
             println!("Necessary external assignment: {:?}", s.1);
             println!("Total preference score: {:?}", s.2);
