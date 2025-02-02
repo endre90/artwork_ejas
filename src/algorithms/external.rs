@@ -13,8 +13,8 @@ pub struct ExternalAssignmentSolution {
     pub internal_assignments: Vec<(String, String)>, // (employee, job) pairs
     pub external_assignments: Vec<String>, // jobs
     pub objective_score: i64,              // final value of the objective function
-    pub preference_objective_score: i64,
-    pub weighted_preference_objective_score: i64,
+    pub preference_reward_score: i64,
+    pub weighted_preference_reward_score: i64,
     pub leader_penalty_score: i64,
     pub weighted_leader_penalty_score: i64,
     pub external_penalty_score: i64,
@@ -247,20 +247,20 @@ pub fn calculate_external_assignment(
     }
 
     // Sum up all these expressions to form the total preference objective
-    let preference_objective = Int::add(&ctx, &preference_score_sum);
+    let preference_reward = Int::add(&ctx, &preference_score_sum);
 
     // Track the value of the preference objective for measurement purposes
-    let preference_objective_tracker = Int::new_const(&ctx, "preference_objective");
-    optimizer.assert(&preference_objective._eq(&preference_objective_tracker));
+    let preference_reward_tracker = Int::new_const(&ctx, "preference_reward");
+    optimizer.assert(&preference_reward._eq(&preference_reward_tracker));
 
     // Add weight to the preference objective
     let omega_z3 = Int::from_i64(&ctx, omega as i64);
-    let weighted_preference_objective = omega_z3 * preference_objective.clone();
+    let weighted_preference_reward = omega_z3 * preference_reward.clone();
 
     // Track the value of the weighted preference objective for measurement purposes
-    let weighted_preference_objective_tracker =
-        Int::new_const(&ctx, "weighted_preference_objective");
-    optimizer.assert(&weighted_preference_objective._eq(&weighted_preference_objective_tracker));
+    let weighted_preference_reward_tracker =
+        Int::new_const(&ctx, "weighted_preference_reward");
+    optimizer.assert(&weighted_preference_reward._eq(&weighted_preference_reward_tracker));
 
     // Team leader objective term:
     // 1. Identify the first TeamLeader in `station.people`.
@@ -339,7 +339,7 @@ pub fn calculate_external_assignment(
     let offset_z3 = Int::from_i64(&ctx, offset as i64);
 
     // The objective os the weighted sum pf objective terms
-    let objective = offset_z3 + weighted_preference_objective.clone()
+    let objective = offset_z3 + weighted_preference_reward.clone()
         - weighted_leader_penalty.clone()
         - weighted_external_penalty.clone();
     optimizer.maximize(&objective);
@@ -379,15 +379,15 @@ pub fn calculate_external_assignment(
             }
 
             let objective_score = get_objective_value(&model, &objective_tracker, "objective");
-            let preference_objective_score = get_objective_value(
+            let preference_reward_score = get_objective_value(
                 &model,
-                &preference_objective_tracker,
-                "preference_objective",
+                &preference_reward_tracker,
+                "preference_reward",
             );
-            let weighted_preference_objective_score = get_objective_value(
+            let weighted_preference_reward_score = get_objective_value(
                 &model,
-                &weighted_preference_objective_tracker,
-                "weighted_preference_objective",
+                &weighted_preference_reward_tracker,
+                "weighted_preference_reward",
             );
             let leader_penalty_score =
                 get_objective_value(&model, &leader_penalty_tracker, "leader_penalty");
@@ -431,8 +431,8 @@ pub fn calculate_external_assignment(
                 internal_assignments,
                 external_assignments,
                 objective_score,
-                preference_objective_score,
-                weighted_preference_objective_score,
+                preference_reward_score,
+                weighted_preference_reward_score,
                 leader_penalty_score,
                 weighted_leader_penalty_score,
                 external_penalty_score,
@@ -448,8 +448,8 @@ pub fn calculate_external_assignment(
                 internal_assignments: Vec::new(),
                 external_assignments: Vec::new(),
                 objective_score: 0,
-                preference_objective_score: 0,
-                weighted_preference_objective_score: 0,
+                preference_reward_score: 0,
+                weighted_preference_reward_score: 0,
                 leader_penalty_score: 0,
                 weighted_leader_penalty_score: 0,
                 external_penalty_score: 0,
@@ -465,8 +465,8 @@ pub fn calculate_external_assignment(
                 internal_assignments: Vec::new(),
                 external_assignments: Vec::new(),
                 objective_score: 0,
-                preference_objective_score: 0,
-                weighted_preference_objective_score: 0,
+                preference_reward_score: 0,
+                weighted_preference_reward_score: 0,
                 leader_penalty_score: 0,
                 weighted_leader_penalty_score: 0,
                 external_penalty_score: 0,
@@ -487,7 +487,7 @@ mod tests {
     use crate::*;
 
     #[test]
-    fn test_static_matrix() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_exteral() -> Result<(), Box<dyn std::error::Error>> {
         let manifest_dir =
             std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
         let s = "S1";
@@ -511,7 +511,7 @@ mod tests {
             println!("    Offs    : {}", offset);
             println!(
                 "    Pref    : {}(omega) x {} = {}",
-                omega, s.preference_objective_score, s.weighted_preference_objective_score
+                omega, s.preference_reward_score, s.weighted_preference_reward_score
             );
             println!(
                 "    Lead    : {}(alpha) x {} = {}",
@@ -524,7 +524,7 @@ mod tests {
             println!(
                 "    Total   : {}(Offs) + {}(Pref) - {}(Lead) - {}(Exte) = {}",
                 offset,
-                s.weighted_preference_objective_score,
+                s.weighted_preference_reward_score,
                 s.weighted_leader_penalty_score,
                 s.weighted_external_penalty_score,
                 s.objective_score

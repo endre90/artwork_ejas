@@ -9,24 +9,34 @@ use z3::{
 use crate::*;
 
 #[derive(Debug)]
-pub struct StaticAssignmentSolution {
+pub struct HistoricAssignmentSolution {
     pub internal_assignments: Vec<(String, String)>, // (employee, job) pairs
-    pub objective_score: i64,              // final value of the objective function
+    pub external_assignments: Vec<String>,           // jobs
+    pub objective_score: i64,                        // final value of the objective function
     pub preference_reward_score: i64,
     pub weighted_preference_reward_score: i64,
     pub leader_penalty_score: i64,
     pub weighted_leader_penalty_score: i64,
+    pub external_penalty_score: i64,
+    pub weighted_external_penalty_score: i64,
+    pub historical_penalty_score: i64,
+    pub weighted_historical_penalty_score: i64,
     pub c_matrix: Vec<Vec<bool>>,  // competence matrix passed back
     pub p_matrix: Vec<Vec<usize>>, // preference matrix passed back
+    pub h_matrix: Vec<Vec<u32>>,   // historic matrix passed back
     pub solving_time: Duration,    // how long the solver took
 }
 
-pub fn calculate_static_assignment(
+pub fn calculate_historic_assignment(
     station: &Station,
+    history: Vec<Day>,
     offset: u32, // Add to objective to get a positive integer result (just for aesthetics)
     omega: u32,  // How strongly preference considerations influence the objective function
     alpha: u32,  // How strongly to discourage leader usage
-) -> StaticAssignmentSolution {
+    beta: u32,   // How strongly to discourage external operator usage
+    tau: u32,    // Number of days to consider in the historical data (from tau to today)
+    gamma: u32, // how strongly to penalize assigning the same employee–job pair that was frequently assigned in the past tau days
+) -> HistoricAssignmentSolution {
     let mut jobs = vec![];
     let mut employees = vec![];
     let mut competences: Vec<(String, Vec<String>)> = vec![];
@@ -79,6 +89,24 @@ pub fn calculate_static_assignment(
         x.push(row);
     }
 
+    // For each job j, we define e_j as a boolean variable indicating whether job j
+    // is assigned to an external employee, i.e., e_j ∈ {true, false}.
+
+    // Create a container for the external assignment variables
+    let mut e = Vec::new();
+
+    // Loop over each job index j
+    for j in 0..jobs.len() {
+        // Create a unique name for the boolean variable e_j
+        let var_name = format!("e_{}", j);
+
+        // Create the boolean variable e_j
+        let e_j = Bool::new_const(&ctx, var_name);
+
+        // Store e_j in the container
+        e.push(e_j);
+    }
+
     // Constraint 1:
     // For each employee i, we want: Σ(x_ij) ≤ 1
     // This means an employee can have at most one job.
@@ -107,10 +135,44 @@ pub fn calculate_static_assignment(
     }
 
     // Constraint 2:
-    // For each job j, we want: Σ(x_ij) ≥ 1
-    // (summed only over those employees i who are competent for job j).
-    // This ensures each job is covered by at least one competent worker.
+    // We want exactly one of either e_j or x_ij for each job j to be true:
+    //   e_j + Σi(x_ij) = 1
+    // This means job j is assigned to exactly one employee:
+    // either an external contractor (e_j) or exactly one internal employee.
 
+    for j in 0..jobs.len() {
+        // Gather all internal-assignment variables x_ij for job j
+        let mut job_constraints = Vec::new();
+        for i in 0..employees.len() {
+            job_constraints.push(x[i][j].clone());
+        }
+
+        // Combine the external variable e_j and the internal variables x_ij
+        let mut all_vars_for_job = Vec::new();
+        all_vars_for_job.push(e[j].clone());
+        all_vars_for_job.extend(job_constraints);
+
+        // Create a "sum = 1" constraint on these boolean variables
+        let at_most_one_employee_per_job = ast::Bool::pb_eq(
+            &ctx,
+            all_vars_for_job
+                .iter()
+                .map(|var| (var, 1)) // each var contributes '1' if true
+                .collect::<Vec<(&ast::Bool, i32)>>()
+                .as_slice(),
+            1, // sum of e_j + x_ij = 1
+        );
+
+        // Assert this constraint in the optimizer
+        optimizer.assert(&at_most_one_employee_per_job);
+    }
+
+    // Constraint 3:
+    // For each job j, we want: Σ(x_ij for all competent i) + e_j ≥ 1
+    // This means each job j is either covered by at least one competent internal employee
+    // or is assigned to an external worker (e_j).
+
+    // Prepare a container to store all variables that can cover each job j
     let mut coverage_per_job: Vec<Vec<ast::Bool>> = vec![Vec::new(); jobs.len()];
 
     // Populate a list of x_ij variables for each job j, but only if employee i is competent
@@ -125,7 +187,8 @@ pub fn calculate_static_assignment(
 
     // For each job j, create a constraint that ensures at least one competent employee is assigned
     for j in 0..jobs.len() {
-        // Build the "sum ≥ 1" constraint from the collected x_ij variables
+        coverage_per_job[j].push(e[j].clone()); // Add the external worker option
+                                                // Build the "sum ≥ 1" constraint from the collected x_ij and e_j variables
         let job_covered = ast::Bool::pb_ge(
             &ctx,
             coverage_per_job[j]
@@ -133,14 +196,14 @@ pub fn calculate_static_assignment(
                 .map(|b| (b, 1)) // each x_ij contributes '1' if it's true
                 .collect::<Vec<(&ast::Bool, i32)>>()
                 .as_slice(),
-            1, // sum of x_ij ≥ 1
+            1, // sum of ≥ 1
         );
 
         // Assert this constraint in the optimizer
         optimizer.assert(&job_covered);
     }
 
-    // Constraint 3:
+    // Constraint 4:
     // We impose x_ij implies c_ij for each employee i and job j.
     // This means if x_ij = true (employee i is assigned to job j),
     // then c_ij must also be true (employee i is competent for job j).
@@ -155,7 +218,7 @@ pub fn calculate_static_assignment(
         }
     }
 
-    // Preference objective term:
+    // Preference reward term:
     // We want to maximize overall preferences. For each employee i and job j,
     // p_matrix[i][j] gives a rank, where a lower rank = higher preference.
     // We convert this rank into a "score" using (jobs.len() - rank).
@@ -201,11 +264,10 @@ pub fn calculate_static_assignment(
     let weighted_preference_reward = omega_z3 * preference_reward.clone();
 
     // Track the value of the weighted preference objective for measurement purposes
-    let weighted_preference_reward_tracker =
-        Int::new_const(&ctx, "weighted_preference_reward");
+    let weighted_preference_reward_tracker = Int::new_const(&ctx, "weighted_preference_reward");
     optimizer.assert(&weighted_preference_reward._eq(&weighted_preference_reward_tracker));
 
-    // Team leader objective term:
+    // Team leader penalty term:
     // 1. Identify the first TeamLeader in `station.people`.
     // 2. Count how many jobs are assigned to that leader using x[index][job] (1 if true, 0 if false).
     // 3. Store this count in an Int expression (`leader_penalty`).
@@ -249,12 +311,85 @@ pub fn calculate_static_assignment(
     let weighted_leader_penalty_tracker = Int::new_const(&ctx, "weighted_leader_penalty");
     optimizer.assert(&weighted_leader_penalty._eq(&weighted_leader_penalty_tracker));
 
+    // External assignment penalty term:
+    // For each job j, e_j is a boolean variable indicating if job j is assigned externally.
+    // We impose a penalty of 1 for each external assignment. Summing these gives the total
+    // count of externally assigned jobs. Then we multiply that sum by beta, a weight
+    // controlling how strongly we penalize external assignments.
+
+    // Build a list of "penalty expressions" for each job's external variable e_j
+    let mut external_penalty_expressions = Vec::new();
+    for e_j in &e {
+        // If e_j is true, add 1; if e_j is false, add 0
+        let penalty_expr = e_j.ite(&Int::from_i64(&ctx, 1), &Int::from_i64(&ctx, 0));
+        external_penalty_expressions.push(penalty_expr);
+    }
+
+    // Sum all these "1 or 0" penalty expressions
+    let external_penalty = Int::add(&ctx, &external_penalty_expressions);
+
+    // Track the external penalty for measurement purposes
+    let external_penalty_tracker = Int::new_const(&ctx, "external_penalty");
+    optimizer.assert(&external_penalty._eq(&external_penalty_tracker));
+
+    // Multiply the total external penalty by beta
+    let beta_z3 = Int::from_i64(&ctx, beta as i64);
+    let weighted_external_penalty = beta_z3 * external_penalty;
+
+    // Track the weighted external penalty for measurement purposes
+    let weighted_external_penalty_tracker = Int::new_const(&ctx, "weighted_external_penalty");
+    optimizer.assert(&weighted_external_penalty_tracker._eq(&weighted_external_penalty));
+
+    // Historic assignment penalty term:
+    // We want to penalize assigning an employee i to a job j if in the past tau days,
+    // that pair (employee i, job j) occurred frequently (according to h_matrix[i][j]).
+    // Formally, each assignment x_ij adds hist_count = h_matrix[i][j] to our penalty sum.
+    // Multiply the total by gamma to control how heavily we penalize repeated usage
+    // of the same employee-job pairing over recent history.
+
+    // Build a historical count matrix h_matrix for the last tau days.
+    // h_matrix[i][j] = how many times employee i was assigned to job j in that period.
+    let h_matrix = build_historical_count_matrix(history, tau as usize, &employees, &jobs);
+
+    // Create expressions: if x_ij is true, add h_matrix[i][j], else add 0.
+    let mut h_fairness_terms = Vec::new();
+    for i in 0..employees.len() {
+        for j in 0..jobs.len() {
+            // how frequently employee i did job j in the past tau days
+            let hist_count = h_matrix[i][j] as i64;
+
+            // if x_ij = true, add hist_count; otherwise 0
+            let penalty_expr = x[i][j].ite(
+                &z3::ast::Int::from_i64(&ctx, hist_count),
+                &z3::ast::Int::from_i64(&ctx, 0),
+            );
+            h_fairness_terms.push(penalty_expr);
+        }
+    }
+
+    // Sum all historical penalty terms across all employees and jobs
+    let historical_penalty = z3::ast::Int::add(&ctx, &h_fairness_terms);
+
+    // Track the historical penalty for measurement purposes
+    let historical_penalty_tracker = Int::new_const(&ctx, "historical_penalty");
+    optimizer.assert(&historical_penalty._eq(&historical_penalty_tracker));
+
+    // Multiply by gamma to get the final historical penalty
+    let gamma_z3 = z3::ast::Int::from_i64(&ctx, gamma as i64);
+    let weighted_historical_penalty = gamma_z3 * historical_penalty;
+
+    // Track the weighted historical penalty for measurement purposes
+    let weighted_historical_penalty_tracker = Int::new_const(&ctx, "weighted_historical_penalty");
+    optimizer.assert(&weighted_historical_penalty_tracker._eq(&weighted_historical_penalty));
+
     // Add offset to the objective
     let offset_z3 = Int::from_i64(&ctx, offset as i64);
 
     // The objective os the weighted sum pf objective terms
-    let objective =
-        offset_z3 + weighted_preference_reward.clone() - weighted_leader_penalty.clone();
+    let objective = offset_z3 + weighted_preference_reward.clone()
+        - weighted_leader_penalty.clone()
+        - weighted_external_penalty.clone()
+        - weighted_historical_penalty.clone();
     optimizer.maximize(&objective);
 
     // Variable to track the total objective
@@ -292,11 +427,8 @@ pub fn calculate_static_assignment(
             }
 
             let objective_score = get_objective_value(&model, &objective_tracker, "objective");
-            let preference_reward_score = get_objective_value(
-                &model,
-                &preference_reward_tracker,
-                "preference_reward",
-            );
+            let preference_reward_score =
+                get_objective_value(&model, &preference_reward_tracker, "preference_reward");
             let weighted_preference_reward_score = get_objective_value(
                 &model,
                 &weighted_preference_reward_tracker,
@@ -310,6 +442,22 @@ pub fn calculate_static_assignment(
                 "weighted_leader_penalty",
             );
 
+            let external_penalty_score =
+                get_objective_value(&model, &external_penalty_tracker, "external_penalty");
+            let weighted_external_penalty_score = get_objective_value(
+                &model,
+                &weighted_external_penalty_tracker,
+                "weighted_external_penalty",
+            );
+
+            let historical_penalty_score =
+                get_objective_value(&model, &historical_penalty_tracker, "historical_penalty");
+            let weighted_historical_penalty_score = get_objective_value(
+                &model,
+                &weighted_historical_penalty_tracker,
+                "weighted_historical_penalty",
+            );
+
             // Build a list of (employee, job) assignments where x[i][j] = true
             let mut internal_assignments = Vec::new();
             for i in 0..employees.len() {
@@ -320,47 +468,73 @@ pub fn calculate_static_assignment(
                 }
             }
 
+            // Build a list of job assignments where e[j] = true
+            let mut external_assignments = Vec::new();
+            for j in 0..jobs.len() {
+                if let Some(true) = model.eval(&e[j], true).unwrap().as_bool() {
+                    external_assignments.push(jobs[j].clone());
+                }
+            }
+
             // Log success
             log::info!(target: "employee_job_assignment", "Solution found");
 
             // Return everything in the AssignmentSolution struct
-            StaticAssignmentSolution {
+            HistoricAssignmentSolution {
                 internal_assignments,
+                external_assignments,
                 objective_score,
                 preference_reward_score,
                 weighted_preference_reward_score,
                 leader_penalty_score,
                 weighted_leader_penalty_score,
+                external_penalty_score,
+                weighted_external_penalty_score,
+                historical_penalty_score,
+                weighted_historical_penalty_score,
                 c_matrix,
                 p_matrix,
+                h_matrix,
                 solving_time,
             }
         }
         SatResult::Unsat => {
             log::warn!(target: "employee_job_assignment", "No solution found");
-            StaticAssignmentSolution {
+            HistoricAssignmentSolution {
                 internal_assignments: Vec::new(),
+                external_assignments: Vec::new(),
                 objective_score: 0,
                 preference_reward_score: 0,
                 weighted_preference_reward_score: 0,
                 leader_penalty_score: 0,
                 weighted_leader_penalty_score: 0,
+                external_penalty_score: 0,
+                weighted_external_penalty_score: 0,
+                historical_penalty_score: 0,
+                weighted_historical_penalty_score: 0,
                 c_matrix,
                 p_matrix,
+                h_matrix,
                 solving_time,
             }
         }
         _ => {
             log::error!(target: "employee_job_assignment", "Solver returned an unknown or failed state");
-            StaticAssignmentSolution {
+            HistoricAssignmentSolution {
                 internal_assignments: Vec::new(),
+                external_assignments: Vec::new(),
                 objective_score: 0,
                 preference_reward_score: 0,
                 weighted_preference_reward_score: 0,
                 leader_penalty_score: 0,
                 weighted_leader_penalty_score: 0,
+                external_penalty_score: 0,
+                weighted_external_penalty_score: 0,
+                historical_penalty_score: 0,
+                weighted_historical_penalty_score: 0,
                 c_matrix,
                 p_matrix,
+                h_matrix,
                 solving_time,
             }
         }
@@ -375,23 +549,37 @@ mod tests {
     use crate::*;
 
     #[test]
-    fn test_static() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_historic() -> Result<(), Box<dyn std::error::Error>> {
         let manifest_dir =
             std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
-        let path = format!("{}/data/S0_matrix.json", manifest_dir);
+        let s = "S0";
+        let e = "E0";
+        let path = format!("{}/data/{}_matrix.json", manifest_dir, s);
+
+        let history_path = format!("{}/data/{}_{}_history.json", manifest_dir, s, e);
+        let history_content = fs::read_to_string(history_path)?;
+        let history_wrapper: Vec<DayWrapper> = serde_json::from_str(&history_content)?;
+        let history: Vec<Day> = history_wrapper.into_iter().map(|dw| dw.day).collect();
 
         let json_content = fs::read_to_string(path)?;
         let matrix: Matrix = serde_json::from_str(&json_content)?;
 
         let offset = 10;
         let omega = 1;
-        let alpha = 3;
+        let alpha = 1;
+        let beta = 1;
+        let tau = 10;
+        let gamma = 1;
 
-        if let Some(station) = matrix.stations.get("S0") {
-            let s = calculate_static_assignment(station, offset, omega, alpha);
+        if let Some(station) = matrix.stations.get(s) {
+            let s = calculate_historic_assignment(
+                station, history.clone(), offset, omega, alpha, beta, tau, gamma,
+            );
             pretty_print_internal_assignments(station, &s.internal_assignments);
+            pretty_print_external_assignments(station, &s.external_assignments);
             pretty_print_competence_matrix(station);
             pretty_print_preference_matrix(station);
+            pretty_print_historical_matrix(station, history, tau);
             println!("=== SCORING ===");
             println!("    Offs    : {}", offset);
             println!(
@@ -403,10 +591,20 @@ mod tests {
                 alpha, s.leader_penalty_score, s.weighted_leader_penalty_score
             );
             println!(
-                "    Total   : {}(Offs) + {}(Pref) + {}(Lead) = {}",
+                "    Exte    : {}(beta) x {} = {}",
+                beta, s.external_penalty_score, s.weighted_external_penalty_score
+            );
+            println!(
+                "    Hist    : {}(gamma) x {} = {}",
+                gamma, s.historical_penalty_score, s.weighted_historical_penalty_score
+            );
+            println!(
+                "    Total   : {}(Offs) + {}(Pref) - {}(Lead) - {}(Exte) - {}(Hist) = {}",
                 offset,
                 s.weighted_preference_reward_score,
                 s.weighted_leader_penalty_score,
+                s.weighted_external_penalty_score,
+                s.weighted_historical_penalty_score,
                 s.objective_score
             );
             println!();
