@@ -144,10 +144,11 @@ pub fn calculate_ergonomic_assignment(
             let rank = p_matrix[i][j];
             let score = (jobs.len() - rank) as i32;
             preference_score.push((
-                Bool::and(
-                    &ctx,
-                    vec![&x[i][j], &Bool::from_bool(&ctx, true)].as_slice(),
-                ),
+                // Bool::and(
+                //     &ctx,
+                //     vec![&x[i][j], &Bool::from_bool(&ctx, true)].as_slice(),
+                // ),
+                x[i][j].clone(),
                 score,
             ));
         }
@@ -225,19 +226,6 @@ pub fn calculate_ergonomic_assignment(
                 .collect()
         })
         .collect();
-
-    // // Ergonomic reward terms: correct but cant implement borrow
-    // let mut ergonomic_terms = Vec::new();
-    // for i in 0..employees.len() {
-    //     for j in 0..jobs.len() {
-    //         let e_eff = e_eff_matrix[i][j];
-    //         let ergonomic_reward = x[i][j].ite(
-    //             &z3::ast::Real::from_real(&ctx, e_eff.0, e_eff.1),
-    //             &z3::ast::Real::from_real(&ctx, 0, 1),
-    //         );
-    //         ergonomic_terms.push(ergonomic_reward);
-    //     }
-    // }
 
     // Ergonomic reward terms
     let mut ergonomic_terms = Vec::new();
@@ -357,15 +345,19 @@ mod tests {
         let history_wrapper: Vec<DayWrapper> = serde_json::from_str(&history_content)?;
         let history: Vec<Day> = history_wrapper.into_iter().map(|dw| dw.day).collect();
 
-        // let h_matrix = build_historical_count_matrix(history.clone(), 10, &employees, &jobs);
-        // println!("       J  J  J  J  J");
-        // println!("Historic assignment count matrix:");
-        // for x in 0..h_matrix.len() {
-        //     println!("{}:{:?}", employees[x], h_matrix[x])
-        // }
+        let offset: u32 = 100; // Add to objective to get a positive integer result (just for aesthetics)
+        let omega: u32 = 1; // How strongly preference considerations influence the objective function
+        let alpha: u32 = 1; // How strongly to discourage leader usage
+        let beta: u32 = 10; // How strongly to discourage external operator usage
+        let tau: u32 = 10; // Number of days to consider in the historical data (from last day to last day - tau)
+        let gamma: u32 = 1; // how strongly to penalize assigning the same employee–job pair that was frequently assigned in the past tau days
+        let delta: u32 = 1; // Ergonomics weight
+        let theta: u32 = 1; // Weight controlling how the historical count reduces the ergonomics benefit of a job for a given employee.
 
-        if let Some(station_1) = matrix.stations.get("S0") {
-            let s = calculate_ergonomic_assignment(station_1, history, 1000, 1, 1, 5, 10, 1, 1, 1);
+        if let Some(station) = matrix.stations.get("S0") {
+            let s = calculate_ergonomic_assignment(
+                station, history, offset, omega, alpha, beta, tau, gamma, delta, theta,
+            );
             println!("Optimal internal assignment: {:?}", s.0);
             println!("Necessary external assignment: {:?}", s.1);
             println!("Total preference score: {:?}", s.2);

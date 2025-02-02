@@ -372,7 +372,7 @@ pub fn calculate_complete_assignment(
         let final_objective = Int::sub(&ctx, &[preference_sum_expr, leader_penalty_sum]);
         let final_objective = Int::sub(&ctx, &[final_objective, external_penalty_sum]);
         let final_objective = Int::sub(&ctx, &[final_objective, h_fairness_penalty_sum]);
-        // let final_objective = Int::add(&ctx, &[final_objective, ergonomic_reward_sum]);
+        let final_objective = Int::add(&ctx, &[final_objective, ergonomic_reward_sum]);
         let final_objective =
             Int::add(&ctx, &[final_objective, Int::from_i64(&ctx, offset as i64)]);
         optimizer.assert(&pref_score._eq(&final_objective));
@@ -381,7 +381,7 @@ pub fn calculate_complete_assignment(
         // If no leader, just use the original preference sum
         let final_objective = Int::sub(&ctx, &[preference_sum_expr, external_penalty_sum]);
         let final_objective = Int::sub(&ctx, &[final_objective, h_fairness_penalty_sum]);
-        // let final_objective = Int::add(&ctx, &[final_objective, ergonomic_reward_sum]);
+        let final_objective = Int::add(&ctx, &[final_objective, ergonomic_reward_sum]);
         let final_objective =
             Int::add(&ctx, &[final_objective, Int::from_i64(&ctx, offset as i64)]);
         optimizer.assert(&pref_score._eq(&final_objective));
@@ -466,13 +466,13 @@ mod tests {
 
         let horizon: usize = 3; // For how many days to plan ahead (the planning horizon (1 means only assignment for today))
         let offset: u32 = 10000; // Add to objective to get a positive integer result (just for aesthetics)
-        let omega: u32 = 1; // How strongly preference considerations influence the objective function
-        let alpha: u32 = 1; // How strongly to discourage leader usage
-        let beta: u32 = 10; // How strongly to discourage external operator usage
-        let tau: u32 = 100; // Number of days to consider in the historical data (from last day to last day - tau)
+        let omega: u32 = 1000; // How strongly preference considerations influence the objective function
+        let alpha: u32 = 10; // How strongly to discourage leader usage
+        let beta: u32 = 1000; // How strongly to discourage external operator usage
+        let tau: u32 = 10; // Number of days to consider in the historical data (from last day to last day - tau)
         let gamma: u32 = 1; // how strongly to penalize assigning the same employee–job pair that was frequently assigned in the past tau days
-        let delta: u32 = 1; // Ergonomics weight
-        let theta: u32 = 1; // Weight controlling how the historical count reduces the ergonomics benefit of a job for a given employee.
+        let delta: u32 = 0; // Ergonomics weight
+        let theta: u32 = 0; // Weight controlling how the historical count reduces the ergonomics benefit of a job for a given employee.
 
         if let Some(station_1) = matrix.stations.get("S0") {
             let s = calculate_complete_assignment(
