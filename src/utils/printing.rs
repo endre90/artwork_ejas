@@ -1,6 +1,6 @@
 use crate::*;
 // Print all (employee -> job) assignments
-pub fn pretty_print_assignment(station: &Station, assignment: &[(String, String)]) {
+pub fn pretty_print_internal_assignments(station: &Station, assignment: &[(String, String)]) {
     // Sort job names (for consistency if you want to show them in some order here)
     let mut sorted_jobs: Vec<String> = station.ergo_score.keys().cloned().collect();
     sorted_jobs.sort();
@@ -9,7 +9,7 @@ pub fn pretty_print_assignment(station: &Station, assignment: &[(String, String)
     // (If you want them sorted, you can sort here as well)
     // let employees: Vec<String> = station.people.iter().map(|p| p.name.clone()).collect();
 
-    println!("=== ASSIGNMENTS ===");
+    println!("=== INTERNAL ASSIGNMENTS ===");
     if assignment.is_empty() {
         println!("No assignments found.");
     } else {
@@ -18,6 +18,22 @@ pub fn pretty_print_assignment(station: &Station, assignment: &[(String, String)
         sorted_assignment.sort_by(|(e1, _), (e2, _)| e1.cmp(e2));
         for (employee, job) in &sorted_assignment {
             println!("    {} -> {}", employee, job);
+        }
+    }
+    println!();
+}
+
+pub fn pretty_print_external_assignments(station: &Station, assignment: &[String]) {
+    // Sort job names (for consistency if you want to show them in some order here)
+    let mut sorted_jobs: Vec<String> = station.ergo_score.keys().cloned().collect();
+    sorted_jobs.sort();
+
+    println!("=== EXTERNAL ASSIGNMENTS ===");
+    if assignment.is_empty() {
+        println!("No assignments found.");
+    } else {
+        for i in 0..assignment.len() {
+            println!("    X{} -> {}", i, assignment[i]);
         }
     }
     println!();

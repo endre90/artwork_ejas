@@ -1,5 +1,3 @@
-use std::collections::hash_map;
-
 use ast::Ast;
 use z3::{
     ast::{Bool, Int},

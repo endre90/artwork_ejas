@@ -69,7 +69,7 @@ pub fn calculate_incremental_assignment(
         .map(|job| station.ergo_score.get(job).copied().unwrap_or(1) as i32) // Default to 1 if not found
         .collect();
 
-    let mut h_matrix = build_historical_count_matrix(history, tau as usize, &employees, &jobs);
+    let h_matrix = build_historical_count_matrix(history, tau as usize, &employees, &jobs);
 
     let mut v = vec![];
     for t in 0..horizon {
@@ -429,7 +429,7 @@ mod tests {
             let delta: u32 = 1; // Ergonomics weight
             let theta: u32 = 1; // Weight controlling how the historical count reduces the ergonomics benefit of a job for a given employee.
 
-            let s = calculate_incremental_assignment(
+            let _ = calculate_incremental_assignment(
                 station, history, horizon, offset, omega, alpha, beta, tau, gamma, delta, theta,
             );
         }
