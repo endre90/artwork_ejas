@@ -28,12 +28,13 @@ pub fn calculate_ergonomic_assignment(
     let mut employees = vec![];
     let mut competences: Vec<(String, Vec<String>)> = vec![];
     let mut preferences: Vec<(String, Vec<String>)> = vec![];
-    for op in station
+    let mut sorted = station
         .ergo_score
         .keys()
         .map(|x| x.to_owned())
-        .collect::<Vec<String>>()
-    {
+        .collect::<Vec<String>>();
+    sorted.sort();
+    for op in sorted {
         jobs.push(op);
     }
 
@@ -356,45 +357,15 @@ mod tests {
         let history_wrapper: Vec<DayWrapper> = serde_json::from_str(&history_content)?;
         let history: Vec<Day> = history_wrapper.into_iter().map(|dw| dw.day).collect();
 
-        let mut jobs = vec![];
-        let mut employees = vec![];
-
-        if let Some(station) = matrix.stations.get(&station) {
-            let mut sorted = station
-                .ergo_score
-                .keys()
-                .map(|x| x.to_owned())
-                .collect::<Vec<String>>();
-            sorted.sort();
-            for op in sorted {
-                jobs.push(op);
-            }
-
-            for person in &station.people {
-                employees.push(person.name.clone());
-            }
-        }
-
-        let h_matrix = build_historical_count_matrix(history.clone(), 10, &employees, &jobs);
+        // let h_matrix = build_historical_count_matrix(history.clone(), 10, &employees, &jobs);
         // println!("       J  J  J  J  J");
-        println!("Historic assignment count matrix:");
-        for x in 0..h_matrix.len() {
-            println!("{}:{:?}", employees[x], h_matrix[x])
-        }
+        // println!("Historic assignment count matrix:");
+        // for x in 0..h_matrix.len() {
+        //     println!("{}:{:?}", employees[x], h_matrix[x])
+        // }
 
         if let Some(station_1) = matrix.stations.get("S0") {
-            let s = calculate_ergonomic_assignment(
-                station_1, 
-                history, 
-                1000, 
-                0, 
-                1, 
-                2, 
-                0, 
-                0, 
-                0,
-                0
-            );
+            let s = calculate_ergonomic_assignment(station_1, history, 1000, 1, 1, 5, 10, 1, 1, 1);
             println!("Optimal internal assignment: {:?}", s.0);
             println!("Necessary external assignment: {:?}", s.1);
             println!("Total preference score: {:?}", s.2);

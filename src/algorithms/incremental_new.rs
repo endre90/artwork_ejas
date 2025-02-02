@@ -1,7 +1,4 @@
-use std::collections::HashMap;
-
 use ast::Ast;
-// use nanoid::nanoid;
 use z3::{
     ast::{Bool, Int},
     *,
@@ -9,24 +6,32 @@ use z3::{
 
 use crate::*;
 
-pub fn calculate_historic_assignment(
+pub fn calculate_incremental_assignment(
     station: &Station,
     history: Vec<Day>,
-    alpha: u32, // How strongly to discourage leader usage
-    beta: u32,  // How strongly to discourage external operator usage
+    horizon: usize, // For how many days to plan ahead (the planning horizon (1 means only assignment for today))
+    offset: u32,    // Add to objective to get a positive integer result (just for aesthetics)
+    omega: u32,     // How strongly preference considerations influence the objective function
+    alpha: u32,     // How strongly to discourage leader usage
+    beta: u32,      // How strongly to discourage external operator usage
     tau: u32, // Number of days to consider in the historical data (from last day to last day - tau)
     gamma: u32, // how strongly to penalize assigning the same employee–job pair that was frequently assigned in the past tau days
-) -> (
+    delta: u32, // Ergonomics weight
+    theta: u32, // Weight controlling how the historical count reduces the ergonomics benefit of a job for a given employee.
+                // A higher theta means historical assignment counts erode the ergonomics score more severely,
+                // thereby discouraging repeated allocations of the same job to a single employee from an ergonomics standpoint
+) -> Vec<(
     Vec<(String, String)>,
     Vec<String>,
     usize,
     Vec<Vec<bool>>,
     Vec<Vec<usize>>,
-) {
+)> {
     let mut jobs = vec![];
     let mut employees = vec![];
     let mut competences: Vec<(String, Vec<String>)> = vec![];
     let mut preferences: Vec<(String, Vec<String>)> = vec![];
+
     let mut sorted = station
         .ergo_score
         .keys()
@@ -46,6 +51,81 @@ pub fn calculate_historic_assignment(
     let c_matrix = build_competence_matrix(&competences, &jobs);
     let p_matrix = build_preference_matrix(&preferences, &jobs);
 
+    // Find a leader index
+    let mut leader_index: Option<usize> = None;
+    for (i, person) in station.people.iter().enumerate() {
+        match person.role {
+            Role::TeamLeader => {
+                leader_index = Some(i);
+                break;
+            }
+            _ => (),
+        }
+    }
+
+    // Build the ergonomic scores for jobs
+    let ergo_scores: Vec<i32> = jobs
+        .iter()
+        .map(|job| station.ergo_score.get(job).copied().unwrap_or(1) as i32) // Default to 1 if not found
+        .collect();
+
+    let mut h_matrix = build_historical_count_matrix(history, tau as usize, &employees, &jobs);
+
+    let mut v = vec![];
+    for t in 0..horizon {
+        let res = step(
+            jobs.clone(),
+            employees.clone(),
+            c_matrix.clone(),
+            p_matrix.clone(),
+            h_matrix.clone(),
+            leader_index,
+            ergo_scores.clone(),
+            offset,
+            omega,
+            alpha,
+            beta,
+            gamma,
+            delta,
+            theta,
+        );
+
+        // Update the h_matrix
+        println!("Day {t}:");
+        println!("Historic assignment count matrix:");
+        for x in 0..h_matrix.len() {
+            println!("{}:{:?}", employees[x], h_matrix[x])
+        }
+        println!("Optimal internal assignment: {:?}", res.0);
+        println!("Necessary external assignment: {:?}", res.1);
+        println!("Total preference score: {:?}", res.2);
+        v.push(res);
+    }
+    v
+}
+
+fn step(
+    jobs: Vec<String>,
+    employees: Vec<String>,
+    c_matrix: Vec<Vec<bool>>,
+    p_matrix: Vec<Vec<usize>>,
+    h_matrix: Vec<Vec<u32>>,
+    leader_index: Option<usize>,
+    ergo_scores: Vec<i32>,
+    offset: u32,
+    omega: u32, // How strongly preference considerations influence the objective function
+    alpha: u32, // How strongly to discourage leader usage
+    beta: u32,  // How strongly to discourage external operator usage
+    gamma: u32, // how strongly to penalize assigning the same employee–job pair that was frequently assigned in the past tau days
+    delta: u32, // Ergonomics weight
+    theta: u32,
+) -> (
+    Vec<(String, String)>,
+    Vec<String>,
+    usize,
+    Vec<Vec<bool>>,
+    Vec<Vec<usize>>,
+) {
     // Create the Z3 context and optimizer
     let cfg = Config::new();
     let ctx = Context::new(&cfg);
@@ -163,19 +243,8 @@ pub fn calculate_historic_assignment(
         .collect();
 
     // Create an Int expression that sums up all preference contributions
-    let preference_sum_expr = Int::add(&ctx, &preference_score_sum);
-
-    // Find a leader index
-    let mut leader_index: Option<usize> = None;
-    for (i, person) in station.people.iter().enumerate() {
-        match person.role {
-            Role::TeamLeader => {
-                leader_index = Some(i);
-                break;
-            }
-            _ => (),
-        }
-    }
+    let preference_sum_expr =
+        Int::from_i64(&ctx, omega as i64) * Int::add(&ctx, &preference_score_sum);
 
     // Penalty for using external employees
     let external_penalty_sum: Int = (Int::from_i64(&ctx, beta as i64))
@@ -184,7 +253,7 @@ pub fn calculate_historic_assignment(
             .fold(Int::from_i64(&ctx, 0), |acc, x| acc + x);
 
     // Penalty for assigning assigning the same employee–job pair that was frequently assigned in the past $\tau$ days
-    let h_matrix = build_historical_count_matrix(history, tau as usize, &employees, &jobs);
+    // let h_matrix = build_historical_count_matrix(history, tau as usize, &employees, &jobs);
     let mut h_fairness_terms = Vec::new();
     for i in 0..employees.len() {
         for j in 0..jobs.len() {
@@ -202,6 +271,52 @@ pub fn calculate_historic_assignment(
     // Variable to track the total preference score
     let pref_score = Int::new_const(&ctx, "pref_score");
 
+    // Compute the effective ergonomics matrix
+    // let theta = 1; // For now should be good enough
+    let e_eff_matrix: Vec<Vec<(i32, i32)>> = h_matrix
+        .iter()
+        .enumerate()
+        .map(|(_, row)| {
+            row.iter()
+                .enumerate()
+                .map(|(j, &h_ij)| {
+                    let e_j = ergo_scores[j];
+                    (e_j, (1 + theta * h_ij) as i32)
+                })
+                .collect()
+        })
+        .collect();
+
+    // // Ergonomic reward terms: correct but cant implement borrow
+    // let mut ergonomic_terms = Vec::new();
+    // for i in 0..employees.len() {
+    //     for j in 0..jobs.len() {
+    //         let e_eff = e_eff_matrix[i][j];
+    //         let ergonomic_reward = x[i][j].ite(
+    //             &z3::ast::Real::from_real(&ctx, e_eff.0, e_eff.1),
+    //             &z3::ast::Real::from_real(&ctx, 0, 1),
+    //         );
+    //         ergonomic_terms.push(ergonomic_reward);
+    //     }
+    // }
+
+    // Ergonomic reward terms
+    let mut ergonomic_terms = Vec::new();
+    for i in 0..employees.len() {
+        for j in 0..jobs.len() {
+            let e_eff = e_eff_matrix[i][j];
+            let ergonomic_reward = x[i][j].ite(
+                &z3::ast::Int::from_i64(&ctx, (e_eff.0 as f64 / e_eff.1 as f64).round() as i64),
+                &z3::ast::Int::from_i64(&ctx, 0),
+            );
+            ergonomic_terms.push(ergonomic_reward);
+        }
+    }
+
+    // Total ergonomic reward
+    let ergonomic_reward_sum =
+        Int::from_i64(&ctx, delta as i64) * z3::ast::Int::add(&ctx, &ergonomic_terms);
+
     // Build objective that includes a penalty if the leader is assigned
     if let Some(l_i) = leader_index {
         let mut leader_penalties = Vec::new();
@@ -215,12 +330,18 @@ pub fn calculate_historic_assignment(
         let final_objective = Int::sub(&ctx, &[preference_sum_expr, leader_penalty_sum]);
         let final_objective = Int::sub(&ctx, &[final_objective, external_penalty_sum]);
         let final_objective = Int::sub(&ctx, &[final_objective, h_fairness_penalty_sum]);
+        let final_objective = Int::add(&ctx, &[final_objective, ergonomic_reward_sum]);
+        let final_objective =
+            Int::add(&ctx, &[final_objective, Int::from_i64(&ctx, offset as i64)]);
         optimizer.assert(&pref_score._eq(&final_objective));
         optimizer.maximize(&final_objective);
     } else {
         // If no leader, just use the original preference sum
         let final_objective = Int::sub(&ctx, &[preference_sum_expr, external_penalty_sum]);
         let final_objective = Int::sub(&ctx, &[final_objective, h_fairness_penalty_sum]);
+        let final_objective = Int::add(&ctx, &[final_objective, ergonomic_reward_sum]);
+        let final_objective =
+            Int::add(&ctx, &[final_objective, Int::from_i64(&ctx, offset as i64)]);
         optimizer.assert(&pref_score._eq(&final_objective));
         optimizer.maximize(&final_objective);
     }
@@ -275,129 +396,6 @@ pub fn calculate_historic_assignment(
     }
 }
 
-fn build_competence_matrix(
-    competence_map: &Vec<(String, Vec<String>)>,
-    job_list: &Vec<String>,
-) -> Vec<Vec<bool>> {
-    // Create a hashmap to map job names to their indices
-    let job_index: HashMap<&String, usize> = job_list
-        .iter()
-        .enumerate()
-        .map(|(i, job)| (job, i))
-        .collect();
-
-    // Initialize the competence matrix with false values
-    let mut competence_matrix = vec![vec![false; job_list.len()]; competence_map.len()];
-
-    // Fill the competence matrix
-    for (employee_index, (_, competences)) in competence_map.iter().enumerate() {
-        for competence in competences {
-            if let Some(&job_index) = job_index.get(competence) {
-                competence_matrix[employee_index][job_index] = true;
-            }
-        }
-    }
-
-    competence_matrix
-}
-
-fn build_preference_matrix(
-    preference_map: &Vec<(String, Vec<String>)>,
-    job_list: &Vec<String>,
-) -> Vec<Vec<usize>> {
-    // Create a hashmap to map job names to their indices
-    let job_index: HashMap<&String, usize> = job_list
-        .iter()
-        .enumerate()
-        .map(|(i, job)| (job, i))
-        .collect();
-
-    // Initialize the preference matrix with default high values (e.g., job_list.len() which is worse than the worst preference)
-    let mut preference_matrix =
-        vec![vec![job_list.len() - 1; job_list.len()]; preference_map.len()];
-
-    // Fill the preference matrix
-    for (employee_index, (_, preferences)) in preference_map.iter().enumerate() {
-        for (rank, job) in preferences.iter().enumerate() {
-            if let Some(&job_idx) = job_index.get(job) {
-                preference_matrix[employee_index][job_idx] = rank;
-            }
-        }
-    }
-
-    preference_matrix
-}
-
-// pub fn build_historical_count_matrix(
-//     history_of_assignments: Vec<Day>,
-//     period: usize,
-//     employees: &Vec<String>,
-//     jobs: &Vec<String>,
-// ) -> Vec<Vec<u32>> {
-//     // Create a mapping from employee/job names to indices
-//     let employee_indices: HashMap<_, _> = employees
-//         .iter()
-//         .enumerate()
-//         .map(|(i, name)| (name.clone(), i))
-//         .collect();
-//     let job_indices: HashMap<_, _> = jobs
-//         .iter()
-//         .enumerate()
-//         .map(|(i, name)| (name.clone(), i))
-//         .collect();
-
-//     // Initialize the historic count matrix with zeros
-//     let mut h_matrix = vec![vec![0; jobs.len()]; employees.len()];
-
-//     // Iterate over the last `period` days in the history
-//     let start_index = if history_of_assignments.len() > period {
-//         history_of_assignments.len() - period
-//     } else {
-//         0
-//     };
-
-//     for day in &history_of_assignments[start_index..] {
-//         for (employee, job) in &day.assignments {
-//             if let (Some(&i), Some(&j)) = (employee_indices.get(employee), job_indices.get(job)) {
-//                 h_matrix[i][j] += 1;
-//             }
-//         }
-//     }
-
-//     h_matrix
-// }
-
-pub fn build_historical_count_matrix(
-    history_of_assignments: Vec<Day>,
-    period: usize,
-    employees: &Vec<String>,
-    jobs: &Vec<String>,
-) -> Vec<Vec<u32>> {
-    // Initialize the historic count matrix with zeros
-    let mut h_matrix = vec![vec![0; jobs.len()]; employees.len()];
-
-    // Calculate how far back we go
-    let start_index = history_of_assignments.len().saturating_sub(period);
-
-    // For each day in the specified slice
-    for day in &history_of_assignments[start_index..] {
-        // `day.assignments` is already a Vec<(String, String)>
-        // so iteration order is the insertion order in that vector.
-        for (employee, job) in &day.assignments {
-            // 1) Find the index of the employee in `employees`
-            if let Some(i) = employees.iter().position(|e| e == employee) {
-                // 2) Find the index of the job in `jobs`
-                if let Some(j_pos) = jobs.iter().position(|job_name| job_name == job) {
-                    // 3) Increment the counter
-                    h_matrix[i][j_pos] += 1;
-                }
-            }
-        }
-    }
-
-    h_matrix
-}
-
 #[cfg(test)]
 mod tests {
 
@@ -406,7 +404,7 @@ mod tests {
     use crate::*;
 
     #[test]
-    fn test_historic_matrix() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_incremental() -> Result<(), Box<dyn std::error::Error>> {
         let station = "S0".to_string();
         let example = "E1".to_string();
         let manifest_dir =
@@ -420,37 +418,20 @@ mod tests {
         let history_wrapper: Vec<DayWrapper> = serde_json::from_str(&history_content)?;
         let history: Vec<Day> = history_wrapper.into_iter().map(|dw| dw.day).collect();
 
-        let mut jobs = vec![];
-        let mut employees = vec![];
-
         if let Some(station) = matrix.stations.get(&station) {
-            let mut sorted = station
-                .ergo_score
-                .keys()
-                .map(|x| x.to_owned())
-                .collect::<Vec<String>>();
-            sorted.sort();
-            for op in sorted {
-                jobs.push(op);
-            }
+            let horizon: usize = 3; // For how many days to plan ahead (the planning horizon (1 means only assignment for today))
+            let offset: u32 = 100; // Add to objective to get a positive integer result (just for aesthetics)
+            let omega: u32 = 1; // How strongly preference considerations influence the objective function
+            let alpha: u32 = 1; // How strongly to discourage leader usage
+            let beta: u32 = 20; // How strongly to discourage external operator usage
+            let tau: u32 = 10; // Number of days to consider in the historical data (from last day to last day - tau)
+            let gamma: u32 = 3; // how strongly to penalize assigning the same employee–job pair that was frequently assigned in the past tau days
+            let delta: u32 = 1; // Ergonomics weight
+            let theta: u32 = 1; // Weight controlling how the historical count reduces the ergonomics benefit of a job for a given employee.
 
-            for person in &station.people {
-                employees.push(person.name.clone());
-            }
-        }
-
-        let h_matrix = build_historical_count_matrix(history.clone(), 10, &employees, &jobs);
-        // println!("       J  J  J  J  J");
-        println!("Historic assignment count matrix:");
-        for x in 0..h_matrix.len() {
-            println!("{}:{:?}", employees[x], h_matrix[x])
-        }
-
-        if let Some(station_1) = matrix.stations.get("S0") {
-            let s = calculate_historic_assignment(station_1, history, 0, 500, 10, 0);
-            println!("Optimal internal assignment: {:?}", s.0);
-            println!("Necessary external assignment: {:?}", s.1);
-            println!("Total preference score: {:?}", s.2);
+            let s = calculate_incremental_assignment(
+                station, history, horizon, offset, omega, alpha, beta, tau, gamma, delta, theta,
+            );
         }
 
         Ok(())

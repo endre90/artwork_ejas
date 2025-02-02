@@ -21,12 +21,13 @@ pub fn calculate_external_assignment(
     let mut employees = vec![];
     let mut competences: Vec<(String, Vec<String>)> = vec![];
     let mut preferences: Vec<(String, Vec<String>)> = vec![];
-    for op in station
+    let mut sorted = station
         .ergo_score
         .keys()
         .map(|x| x.to_owned())
-        .collect::<Vec<String>>()
-    {
+        .collect::<Vec<String>>();
+    sorted.sort();
+    for op in sorted {
         jobs.push(op);
     }
 
