@@ -1,4 +1,4 @@
-pub mod ergonomic_new;
+pub mod ergonomic;
 pub mod r#static;
 pub mod external;
 pub mod historic;

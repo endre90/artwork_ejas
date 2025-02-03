@@ -9,7 +9,7 @@ use z3::{
 use crate::*;
 
 #[derive(Debug)]
-pub struct HistoricAssignmentSolution {
+pub struct ErgonomicAssignmentSolution {
     pub internal_assignments: Vec<(String, String)>, // (employee, job) pairs
     pub external_assignments: Vec<String>,           // jobs
     pub objective_score: i64,                        // final value of the objective function
@@ -21,13 +21,15 @@ pub struct HistoricAssignmentSolution {
     pub weighted_external_penalty_score: i64,
     pub historical_penalty_score: i64,
     pub weighted_historical_penalty_score: i64,
+    pub ergonomics_reward_score: i64,
+    pub weighted_ergonomics_reward_score: i64,
     pub c_matrix: Vec<Vec<bool>>,  // competence matrix passed back
     pub p_matrix: Vec<Vec<usize>>, // preference matrix passed back
     pub h_matrix: Vec<Vec<u32>>,   // historic matrix passed back
     pub solving_time: Duration,    // how long the solver took
 }
 
-pub fn calculate_historic_assignment(
+pub fn calculate_ergonomic_assignment(
     station: &Station,
     history: Vec<Day>,
     offset: u32, // Add to objective to get a positive integer result (just for aesthetics)
@@ -36,7 +38,9 @@ pub fn calculate_historic_assignment(
     beta: u32,   // How strongly to discourage external operator usage
     tau: u32,    // Number of days to consider in the historical data (from tau to today)
     gamma: u32, // how strongly to penalize assigning the same employee–job pair that was frequently assigned in the past tau days
-) -> HistoricAssignmentSolution {
+    delta: u32, // Ergonomics weight
+    theta: u32, // Weight controlling how the historical count reduces the ergonomics benefit of a job for a given employee.
+) -> ErgonomicAssignmentSolution {
     let mut jobs = vec![];
     let mut employees = vec![];
     let mut competences: Vec<(String, Vec<String>)> = vec![];
@@ -340,7 +344,7 @@ pub fn calculate_historic_assignment(
     let weighted_external_penalty_tracker = Int::new_const(&ctx, "weighted_external_penalty");
     optimizer.assert(&weighted_external_penalty_tracker._eq(&weighted_external_penalty));
 
-    // Historic assignment penalty term:
+    // Historic assignment penalty term (imposing rotation):
     // We want to penalize assigning an employee i to a job j if in the past tau days,
     // that pair (employee i, job j) occurred frequently (according to h_matrix[i][j]).
     // Formally, each assignment x_ij adds hist_count = h_matrix[i][j] to our penalty sum.
@@ -382,6 +386,84 @@ pub fn calculate_historic_assignment(
     let weighted_historical_penalty_tracker = Int::new_const(&ctx, "weighted_historical_penalty");
     optimizer.assert(&weighted_historical_penalty_tracker._eq(&weighted_historical_penalty));
 
+    // Ergonomic reward term:
+    // We want to encourage assigning employees to jobs with higher ergonomic scores
+    // and discourage those that have been heavily used historically.
+    // For each (employee i, job j), we compute:
+    //    reward_ij = round( (tau × e_j) / (1 + theta × h_ij) ), if x_ij = true, else 0
+    // where:
+    //    - e_j is the ergonomic score of job j
+    //    - h_ij is how many times employee i did job j in the past
+    //    - theta adjusts how rapidly historical usage reduces the reward
+    //    - tau scales the numerator so we reward high-scoring jobs more heavily
+    // Then we sum all reward_ij and multiply by delta to control
+    // the overall weight of ergonomic considerations in our final objective.
+
+    // Build a vector of ergonomic scores in job order.
+    let ergo_scores: Vec<i32> = jobs
+        .iter()
+        .map(|job| station.ergo_score.get(job).unwrap_or(&1).to_owned() as i32)
+        .collect();
+
+    // Build the effective ergonomics matrix (e_eff_matrix).
+    // Each entry e_eff_matrix[i][j] = (ergo_score_j, denominator),
+    // where denominator = 1 + theta × h_ij.
+    let e_eff_matrix: Vec<Vec<(i32, i32)>> = h_matrix
+        .iter()
+        .map(|row| {
+            row.iter()
+                .enumerate()
+                .map(|(j, &h_ij)| {
+                    let e_j = ergo_scores[j];
+                    // for each job j, we compute 1 + theta * h_ij
+                    let denom = 1 + theta * h_ij;
+                    (e_j, denom as i32)
+                })
+                .collect()
+        })
+        .collect();
+
+    // Create an ergonomic reward expression for each (i, j).
+    // If x_ij is true, we add round( (tau × e_j) / denominator ); otherwise 0.
+    let mut ergonomic_terms = Vec::new();
+
+    for i in 0..employees.len() {
+        for j in 0..jobs.len() {
+            // e_eff_matrix[i][j] contains (ergo_score_j, denominator)
+            let (ergo_score_j, denom) = e_eff_matrix[i][j];
+
+            // Multiply the job's ergonomic score by tau to increase its relative weight
+            let numerator = (tau as i64) * (ergo_score_j as i64);
+
+            // Convert the fraction to an integer by rounding
+            let ratio_value = (numerator as f64 / denom as f64).round() as i64;
+
+            // Build an if-then-else expression:
+            // ratio_value if x_ij = true, else 0
+            let ergonomic_reward_expr = x[i][j].ite(
+                &z3::ast::Int::from_i64(&ctx, ratio_value),
+                &z3::ast::Int::from_i64(&ctx, 0),
+            );
+
+            ergonomic_terms.push(ergonomic_reward_expr);
+        }
+    }
+
+    // Sum up all these expressions to form the total ergonomics objective
+    let ergonomics_reward = Int::add(&ctx, &ergonomic_terms);
+
+    // Track the value of the ergonomics objective for measurement purposes
+    let ergonomics_reward_tracker = Int::new_const(&ctx, "ergonomics_reward");
+    optimizer.assert(&ergonomics_reward._eq(&ergonomics_reward_tracker));
+
+    // Add weight to the preference objective
+    let delta_z3 = z3::ast::Int::from_i64(&ctx, delta as i64);
+    let weighted_ergonomics_reward = delta_z3 * ergonomics_reward.clone();
+
+    // Track the value of the weighted preference objective for measurement purposes
+    let weighted_ergonomics_reward_tracker = Int::new_const(&ctx, "weighted_ergonomics_reward");
+    optimizer.assert(&weighted_ergonomics_reward._eq(&weighted_ergonomics_reward_tracker));
+
     // Add offset to the objective
     let offset_z3 = Int::from_i64(&ctx, offset as i64);
 
@@ -389,7 +471,10 @@ pub fn calculate_historic_assignment(
     let objective = offset_z3 + weighted_preference_reward.clone()
         - weighted_leader_penalty.clone()
         - weighted_external_penalty.clone()
-        - weighted_historical_penalty.clone();
+        - weighted_historical_penalty.clone()
+        + weighted_ergonomics_reward.clone();
+
+    // The goal is to maximize the total score (objective)
     optimizer.maximize(&objective);
 
     // Variable to track the total objective
@@ -458,6 +543,14 @@ pub fn calculate_historic_assignment(
                 "weighted_historical_penalty",
             );
 
+            let ergonomics_reward_score =
+                get_objective_value(&model, &ergonomics_reward_tracker, "ergonomics_reward");
+            let weighted_ergonomics_reward_score = get_objective_value(
+                &model,
+                &weighted_ergonomics_reward_tracker,
+                "weighted_ergonomics_reward",
+            );
+
             // Build a list of (employee, job) assignments where x[i][j] = true
             let mut internal_assignments = Vec::new();
             for i in 0..employees.len() {
@@ -480,7 +573,7 @@ pub fn calculate_historic_assignment(
             log::info!(target: "employee_job_assignment", "Solution found");
 
             // Return everything in the AssignmentSolution struct
-            HistoricAssignmentSolution {
+            ErgonomicAssignmentSolution {
                 internal_assignments,
                 external_assignments,
                 objective_score,
@@ -492,6 +585,8 @@ pub fn calculate_historic_assignment(
                 weighted_external_penalty_score,
                 historical_penalty_score,
                 weighted_historical_penalty_score,
+                ergonomics_reward_score,
+                weighted_ergonomics_reward_score,
                 c_matrix,
                 p_matrix,
                 h_matrix,
@@ -500,7 +595,7 @@ pub fn calculate_historic_assignment(
         }
         SatResult::Unsat => {
             log::warn!(target: "employee_job_assignment", "No solution found");
-            HistoricAssignmentSolution {
+            ErgonomicAssignmentSolution {
                 internal_assignments: Vec::new(),
                 external_assignments: Vec::new(),
                 objective_score: 0,
@@ -512,6 +607,8 @@ pub fn calculate_historic_assignment(
                 weighted_external_penalty_score: 0,
                 historical_penalty_score: 0,
                 weighted_historical_penalty_score: 0,
+                ergonomics_reward_score: 0,
+                weighted_ergonomics_reward_score: 0,
                 c_matrix,
                 p_matrix,
                 h_matrix,
@@ -520,7 +617,7 @@ pub fn calculate_historic_assignment(
         }
         _ => {
             log::error!(target: "employee_job_assignment", "Solver returned an unknown or failed state");
-            HistoricAssignmentSolution {
+            ErgonomicAssignmentSolution {
                 internal_assignments: Vec::new(),
                 external_assignments: Vec::new(),
                 objective_score: 0,
@@ -532,6 +629,8 @@ pub fn calculate_historic_assignment(
                 weighted_external_penalty_score: 0,
                 historical_penalty_score: 0,
                 weighted_historical_penalty_score: 0,
+                ergonomics_reward_score: 0,
+                weighted_ergonomics_reward_score: 0,
                 c_matrix,
                 p_matrix,
                 h_matrix,
@@ -570,10 +669,21 @@ mod tests {
         let beta = 5;
         let tau = 10;
         let gamma = 1;
+        let theta = 1;
+        let delta = 1;
 
         if let Some(station) = matrix.stations.get(s) {
-            let s = calculate_historic_assignment(
-                station, history.clone(), offset, omega, alpha, beta, tau, gamma,
+            let s = calculate_ergonomic_assignment(
+                station,
+                history.clone(),
+                offset,
+                omega,
+                alpha,
+                beta,
+                tau,
+                gamma,
+                delta,
+                theta,
             );
             pretty_print_internal_assignments(station, &s.internal_assignments);
             pretty_print_external_assignments(station, &s.external_assignments);
@@ -599,12 +709,17 @@ mod tests {
                 gamma, s.historical_penalty_score, s.weighted_historical_penalty_score
             );
             println!(
-                "    Total   : {}(Offs) + {}(Pref) - {}(Lead) - {}(Exte) - {}(Hist) = {}",
+                "    Ergo    : {}(delta) x {} = {}",
+                delta, s.ergonomics_reward_score, s.weighted_ergonomics_reward_score
+            );
+            println!(
+                "    Total   : {}(Offs) + {}(Pref) - {}(Lead) - {}(Exte) - {}(Hist) + {}(Ergo)= {}",
                 offset,
                 s.weighted_preference_reward_score,
                 s.weighted_leader_penalty_score,
                 s.weighted_external_penalty_score,
                 s.weighted_historical_penalty_score,
+                s.weighted_ergonomics_reward_score,
                 s.objective_score
             );
             println!();
