@@ -1,4 +1,4 @@
-use std::time::{Duration, Instant};
+use std::{cmp::{max, min}, collections::{HashMap, HashSet, VecDeque}, time::{Duration, Instant}};
 
 use ast::Ast;
 use z3::{
@@ -8,7 +8,8 @@ use z3::{
 
 use crate::*;
 
-#[derive(Debug)]
+// #[derive(Debug)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct StaticAssignmentSolution {
     pub internal_assignments: Vec<(String, String)>, // (employee, job) pairs
     pub objective_score: i64,              // final value of the objective function
@@ -367,6 +368,161 @@ pub fn calculate_static_assignment(
     }
 }
 
+
+/// Each unique output from your function. Here, we're just using
+/// the internal assignments `(Vec<(String, String)>)` as the key.
+/// If you also need to factor in a `score` or something else,
+/// make a struct that is `#[derive(Eq, PartialEq, Hash)]`.
+pub type OutputKey = Vec<(String, String)>;
+
+/// A rectangle in the 2D input space (omega, alpha).
+/// For instance, [omega_min..=omega_max] x [alpha_min..=alpha_max].
+#[derive(Debug)]
+pub struct Rect2D {
+    pub omega_min: u32,
+    pub omega_max: u32,
+    pub alpha_min: u32,
+    pub alpha_max: u32,
+}
+
+/// This will hold **all** the rectangles for a particular output.
+/// Each rectangle is one connected component of `(omega, alpha)` points.
+#[derive(Debug)]
+pub struct GroupedRectangles {
+    pub rects: Vec<Rect2D>,
+}
+
+/// The structure we'll use *internally* to accumulate raw points
+/// for each unique output before post-processing.
+#[derive(Debug)]
+pub struct RawGroup {
+    pub points: Vec<(u32, u32)>,
+}
+
+/// Your main function that:
+/// 1) Iterates over omega in [omega_min..=omega_max],
+///    alpha in [alpha_min..=alpha_max].
+/// 2) Calls `calculate_static_assignment(...)` to get an output.
+/// 3) Collects all points that share that same output in a HashMap.
+/// 4) Post-processes each group to find disjoint rectangles (connected components).
+pub fn run_and_group(
+    station: &Station,
+    offset: u32,
+    omega_min: u32,
+    omega_max: u32,
+    alpha_min: u32,
+    alpha_max: u32,
+) -> HashMap<OutputKey, GroupedRectangles> {
+    // 1) Gather raw points for each unique output key
+    let mut raw_map: HashMap<OutputKey, RawGroup> = HashMap::new();
+
+    for omega in omega_min..=omega_max {
+        for alpha in alpha_min..=alpha_max {
+            let solution = calculate_static_assignment(station, offset, omega, alpha);
+
+            // The "key" we use for grouping is the `internal_assignments`.
+            // If you also want to factor in `objective_score` or other data,
+            // create a custom struct that derives `Eq, Hash`.
+            let output_key = solution.internal_assignments;
+
+            let entry = raw_map.entry(output_key).or_insert_with(|| RawGroup {
+                points: Vec::new(),
+            });
+
+            entry.points.push((omega, alpha));
+        }
+    }
+
+    // 2) Post-process each group to find disjoint bounding boxes
+    //    and build the final `HashMap<OutputKey, GroupedRectangles>`.
+    let mut final_map: HashMap<OutputKey, GroupedRectangles> = HashMap::new();
+
+    for (key, raw_group) in raw_map {
+        let rects = find_disjoint_bounding_boxes(&raw_group.points);
+        final_map.insert(key, GroupedRectangles { rects });
+    }
+
+    final_map
+}
+
+/// Given a list of points in 2D, find all connected components
+/// (4-direction adjacency) and return each component's bounding box.
+pub fn find_disjoint_bounding_boxes(points: &[(u32, u32)]) -> Vec<Rect2D> {
+    // Put all points in a set for O(1) membership checks
+    let set: HashSet<(u32, u32)> = points.iter().copied().collect();
+
+    let mut visited: HashSet<(u32, u32)> = HashSet::new();
+    let mut result = Vec::new();
+
+    // For each point, if we haven't visited it yet, BFS to find its entire region
+    for &start in &set {
+        if visited.contains(&start) {
+            continue;
+        }
+
+        // We'll track the bounding box for this region
+        let (mut min_om, mut max_om) = (start.0, start.0);
+        let (mut min_al, mut max_al) = (start.1, start.1);
+
+        // BFS queue
+        let mut queue = VecDeque::new();
+        queue.push_back(start);
+        visited.insert(start);
+
+        while let Some((om, al)) = queue.pop_front() {
+            // Update bounding box
+            if om < min_om { min_om = om; }
+            if om > max_om { max_om = om; }
+            if al < min_al { min_al = al; }
+            if al > max_al { max_al = al; }
+
+            // Explore neighbors in 4 directions
+            for (nom, nal) in neighbors_4(om, al) {
+                if set.contains(&(nom, nal)) && !visited.contains(&(nom, nal)) {
+                    visited.insert((nom, nal));
+                    queue.push_back((nom, nal));
+                }
+            }
+        }
+
+        // One connected component => one bounding box
+        result.push(Rect2D {
+            omega_min: min_om,
+            omega_max: max_om,
+            alpha_min: min_al,
+            alpha_max: max_al,
+        });
+    }
+
+    result
+}
+
+/// Return the 4-direction neighbors of (omega, alpha),
+/// skipping underflow for `u32 = 0`.
+pub fn neighbors_4(om: u32, al: u32) -> Vec<(u32, u32)> {
+    let mut result = Vec::with_capacity(4);
+    
+    // (om+1, al)
+    result.push((om + 1, al));
+
+    // (om-1, al) if om > 0
+    if om > 0 {
+        result.push((om - 1, al));
+    }
+
+    // (om, al+1)
+    result.push((om, al + 1));
+
+    // (om, al-1) if al > 0
+    if al > 0 {
+        result.push((om, al - 1));
+    }
+
+    result
+}
+
+
+
 #[cfg(test)]
 mod tests {
 
@@ -378,7 +534,9 @@ mod tests {
     fn test_static() -> Result<(), Box<dyn std::error::Error>> {
         let manifest_dir =
             std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
-        let path = format!("{}/data/S0_matrix.json", manifest_dir);
+        let s = "S1";
+        // let e = "E0";
+        let path = format!("{}/data/{}_matrix.json", manifest_dir, s);
 
         let json_content = fs::read_to_string(path)?;
         let matrix: Matrix = serde_json::from_str(&json_content)?;
@@ -387,7 +545,7 @@ mod tests {
         let omega = 1;
         let alpha = 3;
 
-        if let Some(station) = matrix.stations.get("S0") {
+        if let Some(station) = matrix.stations.get(s) {
             let s = calculate_static_assignment(station, offset, omega, alpha);
             pretty_print_internal_assignments(station, &s.internal_assignments);
             pretty_print_competence_matrix(station);
@@ -412,8 +570,18 @@ mod tests {
             println!();
             println!("=== SOLVER TIME ===");
             println!("    {:?}", s.solving_time);
+
+            let hashmap = run_and_group(station, offset, 1, 10, 1, 10);
+            println!("{:?}", hashmap.len());
+            for k in hashmap.keys() {
+                println!("{:?}", k);
+            }
+            // println!("{:?}", hashmap.keys());
         }
+
+        
 
         Ok(())
     }
+
 }
