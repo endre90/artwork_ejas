@@ -1,6 +1,7 @@
 use std::{cmp::{max, min}, collections::{HashMap, HashSet, VecDeque}, time::{Duration, Instant}};
 
 use ast::Ast;
+use serde::{Deserialize, Serialize};
 use z3::{
     ast::{Bool, Int},
     *,
@@ -369,15 +370,8 @@ pub fn calculate_static_assignment(
 }
 
 
-/// Each unique output from your function. Here, we're just using
-/// the internal assignments `(Vec<(String, String)>)` as the key.
-/// If you also need to factor in a `score` or something else,
-/// make a struct that is `#[derive(Eq, PartialEq, Hash)]`.
-pub type OutputKey = Vec<(String, String)>;
-
-/// A rectangle in the 2D input space (omega, alpha).
-/// For instance, [omega_min..=omega_max] x [alpha_min..=alpha_max].
-#[derive(Debug)]
+/// Represents one rectangle in (omega, alpha) space.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Rect2D {
     pub omega_min: u32,
     pub omega_max: u32,
@@ -385,26 +379,40 @@ pub struct Rect2D {
     pub alpha_max: u32,
 }
 
-/// This will hold **all** the rectangles for a particular output.
-/// Each rectangle is one connected component of `(omega, alpha)` points.
-#[derive(Debug)]
+/// Holds all rectangles (disjoint regions) for one particular output key.
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GroupedRectangles {
     pub rects: Vec<Rect2D>,
 }
 
-/// The structure we'll use *internally* to accumulate raw points
-/// for each unique output before post-processing.
-#[derive(Debug)]
-pub struct RawGroup {
-    pub points: Vec<(u32, u32)>,
+/// Dummy "Station" type; replace with your real type
+// pub struct Station;
+
+/// Example of what your assignment function might return.
+pub struct Solution {
+    pub internal_assignments: Vec<(String, String)>,
+    pub objective_score: i64,
 }
 
-/// Your main function that:
-/// 1) Iterates over omega in [omega_min..=omega_max],
-///    alpha in [alpha_min..=alpha_max].
-/// 2) Calls `calculate_static_assignment(...)` to get an output.
-/// 3) Collects all points that share that same output in a HashMap.
-/// 4) Post-processes each group to find disjoint rectangles (connected components).
+/// If your real key is more complex than a `Vec<(String, String)>`,
+/// define a struct that implements `Ord` + `Eq` + `Hash` + `Serialize`.
+/// Here we demonstrate just `Vec<(String, String)>` as the "OutputKey".
+pub type OutputKey = Vec<(String, String)>;
+
+// -------------------- Deterministic Grouping Code --------------------
+
+/// We'll store final data for JSON as a list of these items.
+/// The user can then pick a short "key_id" to name each unique output
+/// rather than the full text, but we still store the full "output_key" if desired.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct JsonOutputItem {
+    pub key_id: String,
+    pub output_key: OutputKey,
+    pub rects: Vec<Rect2D>,
+}
+
+/// The main function to get deterministic results, returning a vector of
+/// `(OutputKey, GroupedRectangles)` **in sorted order**.
 pub fn run_and_group(
     station: &Station,
     offset: u32,
@@ -412,129 +420,189 @@ pub fn run_and_group(
     omega_max: u32,
     alpha_min: u32,
     alpha_max: u32,
-) -> HashMap<OutputKey, GroupedRectangles> {
-    // 1) Gather raw points for each unique output key
-    let mut raw_map: HashMap<OutputKey, RawGroup> = HashMap::new();
+) -> Vec<(OutputKey, GroupedRectangles)> {
+    // 1) Collect all (OutputKey, omega, alpha) into a Vec
+    let mut all_data: Vec<(OutputKey, u32, u32)> = Vec::new();
 
     for omega in omega_min..=omega_max {
         for alpha in alpha_min..=alpha_max {
             let solution = calculate_static_assignment(station, offset, omega, alpha);
 
-            // The "key" we use for grouping is the `internal_assignments`.
-            // If you also want to factor in `objective_score` or other data,
-            // create a custom struct that derives `Eq, Hash`.
-            let output_key = solution.internal_assignments;
+            // If you need stable ordering inside the OutputKey,
+            // make sure to sort the pairs themselves.
+            let mut key = solution.internal_assignments;
+            key.sort(); // ensures consistent ordering of (String, String)
 
-            let entry = raw_map.entry(output_key).or_insert_with(|| RawGroup {
-                points: Vec::new(),
-            });
-
-            entry.points.push((omega, alpha));
+            all_data.push((key, omega, alpha));
         }
     }
 
-    // 2) Post-process each group to find disjoint bounding boxes
-    //    and build the final `HashMap<OutputKey, GroupedRectangles>`.
-    let mut final_map: HashMap<OutputKey, GroupedRectangles> = HashMap::new();
+    // 2) Sort by (OutputKey, then omega, then alpha).
+    all_data.sort_by(|(k1, o1, a1), (k2, o2, a2)| {
+        match k1.cmp(k2) {
+            std::cmp::Ordering::Equal => match o1.cmp(o2) {
+                std::cmp::Ordering::Equal => a1.cmp(a2),
+                other => other,
+            },
+            other => other,
+        }
+    });
 
-    for (key, raw_group) in raw_map {
-        let rects = find_disjoint_bounding_boxes(&raw_group.points);
-        final_map.insert(key, GroupedRectangles { rects });
+    // 3) Group by OutputKey and find disjoint rectangles for each
+    let mut result: Vec<(OutputKey, GroupedRectangles)> = Vec::new();
+
+    // Helper to flush each group
+    fn push_group(
+        result: &mut Vec<(OutputKey, GroupedRectangles)>,
+        current_key: OutputKey,
+        current_points: &[(u32, u32)],
+    ) {
+        let rects = find_disjoint_bounding_boxes(current_points);
+        result.push((current_key, GroupedRectangles { rects }));
     }
 
-    final_map
-}
+    let mut current_key: Option<OutputKey> = None;
+    let mut current_points: Vec<(u32, u32)> = Vec::new();
 
-/// Given a list of points in 2D, find all connected components
-/// (4-direction adjacency) and return each component's bounding box.
-pub fn find_disjoint_bounding_boxes(points: &[(u32, u32)]) -> Vec<Rect2D> {
-    // Put all points in a set for O(1) membership checks
-    let set: HashSet<(u32, u32)> = points.iter().copied().collect();
+    for (key, om, al) in all_data {
+        match &mut current_key {
+            None => {
+                current_key = Some(key);
+                current_points.clear();
+                current_points.push((om, al));
+            }
+            Some(k) => {
+                if *k == key {
+                    current_points.push((om, al));
+                } else {
+                    // flush the old group
+                    let old_key = std::mem::take(k);
+                    push_group(&mut result, old_key, &current_points);
 
-    let mut visited: HashSet<(u32, u32)> = HashSet::new();
-    let mut result = Vec::new();
-
-    // For each point, if we haven't visited it yet, BFS to find its entire region
-    for &start in &set {
-        if visited.contains(&start) {
-            continue;
-        }
-
-        // We'll track the bounding box for this region
-        let (mut min_om, mut max_om) = (start.0, start.0);
-        let (mut min_al, mut max_al) = (start.1, start.1);
-
-        // BFS queue
-        let mut queue = VecDeque::new();
-        queue.push_back(start);
-        visited.insert(start);
-
-        while let Some((om, al)) = queue.pop_front() {
-            // Update bounding box
-            if om < min_om { min_om = om; }
-            if om > max_om { max_om = om; }
-            if al < min_al { min_al = al; }
-            if al > max_al { max_al = al; }
-
-            // Explore neighbors in 4 directions
-            for (nom, nal) in neighbors_4(om, al) {
-                if set.contains(&(nom, nal)) && !visited.contains(&(nom, nal)) {
-                    visited.insert((nom, nal));
-                    queue.push_back((nom, nal));
+                    // start the new group
+                    *k = key;
+                    current_points.clear();
+                    current_points.push((om, al));
                 }
             }
         }
+    }
+    // flush final group
+    if let Some(k) = current_key {
+        push_group(&mut result, k, &current_points);
+    }
 
-        // One connected component => one bounding box
-        result.push(Rect2D {
-            omega_min: min_om,
-            omega_max: max_om,
-            alpha_min: min_al,
-            alpha_max: max_al,
+    // Sort final bounding boxes for consistency (optional)
+    for (_, group) in &mut result {
+        group.rects.sort_by(|r1, r2| {
+            (r1.omega_min, r1.alpha_min).cmp(&(r2.omega_min, r2.alpha_min))
         });
     }
 
     result
 }
 
-/// Return the 4-direction neighbors of (omega, alpha),
-/// skipping underflow for `u32 = 0`.
-pub fn neighbors_4(om: u32, al: u32) -> Vec<(u32, u32)> {
-    let mut result = Vec::with_capacity(4);
-    
-    // (om+1, al)
-    result.push((om + 1, al));
+/// Finds disjoint connected components among the given points
+/// in 2D (omega, alpha), returning one bounding box per component.
+fn find_disjoint_bounding_boxes(points: &[(u32, u32)]) -> Vec<Rect2D> {
+    use std::collections::BTreeSet;
+    let btree: BTreeSet<(u32, u32)> = points.iter().copied().collect();
+    let mut visited = BTreeSet::new();
+    let mut rects = Vec::new();
 
-    // (om-1, al) if om > 0
-    if om > 0 {
-        result.push((om - 1, al));
+    for &start in &btree {
+        if visited.contains(&start) {
+            continue;
+        }
+        // BFS from start
+        let mut queue = VecDeque::new();
+        queue.push_back(start);
+        visited.insert(start);
+
+        let (mut om_min, mut om_max) = (start.0, start.0);
+        let (mut al_min, mut al_max) = (start.1, start.1);
+
+        while let Some((om, al)) = queue.pop_front() {
+            om_min = min(om_min, om);
+            om_max = max(om_max, om);
+            al_min = min(al_min, al);
+            al_max = max(al_max, al);
+
+            for neighbor in neighbors_4(om, al) {
+                if btree.contains(&neighbor) && !visited.contains(&neighbor) {
+                    visited.insert(neighbor);
+                    queue.push_back(neighbor);
+                }
+            }
+        }
+
+        rects.push(Rect2D {
+            omega_min: om_min,
+            omega_max: om_max,
+            alpha_min: al_min,
+            alpha_max: al_max,
+        });
     }
 
-    // (om, al+1)
-    result.push((om, al + 1));
+    rects
+}
 
-    // (om, al-1) if al > 0
+/// Return neighbors in a stable order (for BFS).
+fn neighbors_4(om: u32, al: u32) -> Vec<(u32, u32)> {
+    let mut v = Vec::new();
+    // For example, up, left, right, down:
     if al > 0 {
-        result.push((om, al - 1));
+        v.push((om, al - 1)); // up
     }
-
-    result
+    if om > 0 {
+        v.push((om - 1, al)); // left
+    }
+    v.push((om + 1, al));    // right
+    v.push((om, al + 1));    // down
+    v
 }
 
 
+/// Suppose this is your main function
+pub fn write_to_file(solutions: &Vec<(OutputKey, GroupedRectangles)>) -> std::io::Result<()> {
+    // let station = Station;
+    // collect data
+    // let results = run_and_group(&station, 0, 0, 5, 0, 5);
+
+    // Build a list of JsonOutputItem, giving each output a short name.
+    let mut output_items = Vec::new();
+    for (i, (output_key, grouped_rects)) in solutions.into_iter().enumerate() {
+        let key_id = format!("K{}", i + 1); // or "ZONE-1", "ZONE-2", etc.
+        let item = JsonOutputItem {
+            key_id,
+            output_key: output_key.to_owned(),
+            rects: grouped_rects.rects.clone(),
+        };
+        output_items.push(item);
+    }
+
+    // Convert to pretty-printed JSON
+    let json_str = serde_json::to_string_pretty(&output_items)
+        .expect("Failed to serialize to JSON");
+
+    // Write to file
+    std::fs::write("/home/endre/Desktop/zones.json", json_str)?;
+
+    Ok(())
+}
 
 #[cfg(test)]
 mod tests {
 
     use std::fs;
 
-    use crate::*;
+    use crate::{algorithms::r#static::write_to_file, *};
 
     #[test]
     fn test_static() -> Result<(), Box<dyn std::error::Error>> {
         let manifest_dir =
             std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
-        let s = "S1";
+        let s = "S0";
         // let e = "E0";
         let path = format!("{}/data/{}_matrix.json", manifest_dir, s);
 
@@ -571,11 +639,16 @@ mod tests {
             println!("=== SOLVER TIME ===");
             println!("    {:?}", s.solving_time);
 
-            let hashmap = run_and_group(station, offset, 1, 10, 1, 10);
-            println!("{:?}", hashmap.len());
-            for k in hashmap.keys() {
+            let solutions = run_and_group(station, offset, 0, 9, 0, 9);
+            println!("{:?}", solutions.len());
+            for (k, v) in &solutions {
                 println!("{:?}", k);
+                println!("{:?}", v);
             }
+
+            let _ =write_to_file(&solutions);
+
+            
             // println!("{:?}", hashmap.keys());
         }
 
