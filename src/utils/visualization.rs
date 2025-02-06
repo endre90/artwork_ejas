@@ -253,7 +253,6 @@ for (i, (key, points)) in solutions.into_iter().enumerate() {
 let json_str = serde_json::to_string_pretty(&json_items)
     .expect("Failed to serialize to JSON");
 
-
     // Write to file
     std::fs::write("/home/endre/Desktop/points.json", json_str)?;
 

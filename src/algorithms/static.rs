@@ -381,7 +381,7 @@ mod tests {
     fn test_static() -> Result<(), Box<dyn std::error::Error>> {
         let manifest_dir =
             std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
-        let s = "S1";
+        let s = "S2";
         // let e = "E0";
         let path = format!("{}/data/{}_matrix.json", manifest_dir, s);
 
@@ -427,12 +427,12 @@ mod tests {
 
             // let _ = write_to_file(&zones);
 
-            let points = run_and_group_points(station, offset, 0, 9, 0, 9);
+            let points = run_and_group_points(station, offset, 0, 20, 0, 20);
             println!("{:?}", points.len());
-            // for (k, v) in &points {
-            //     println!("{:?}", k);
-            //     println!("{:?}", v);
-            // }
+            for (k, v) in &points {
+                println!("{:?}", k);
+                println!("{:?}", v);
+            }
 
             let _ = write_to_file_points(&points);
 

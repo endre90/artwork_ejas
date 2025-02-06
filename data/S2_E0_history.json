@@ -1,0 +1,133 @@
+[
+    {
+      "day": {
+        "date": { "year": 2024, "month": 5, "day": 7 },
+        "station": "S2",
+        "assignments": [
+          ["A", "O1"],
+          ["B", "O2"],
+          ["D", "O3"],
+          ["E", "O4"],
+          ["C", "O5"]
+        ]
+      }
+    },
+    {
+      "day": {
+        "date": { "year": 2024, "month": 5, "day": 8 },
+        "station": "S2",
+        "assignments": [
+          ["C", "O1"],
+          ["A", "O2"],
+          ["B", "O3"],
+          ["F", "O4"],
+          ["E", "O5"]
+        ]
+      }
+    },
+    {
+      "day": {
+        "date": { "year": 2024, "month": 5, "day": 9 },
+        "station": "S2",
+        "assignments": [
+          ["F", "O1"],
+          ["D", "O2"],
+          ["A", "O3"],
+          ["E", "O4"],
+          ["C", "O5"]
+        ]
+      }
+    },
+    {
+      "day": {
+        "date": { "year": 2024, "month": 5, "day": 10 },
+        "station": "S2",
+        "assignments": [
+          ["C", "O1"],
+          ["B", "O2"],
+          ["A", "O3"],
+          ["F", "O4"],
+          ["E", "O5"]
+        ]
+      }
+    },
+    {
+      "day": {
+        "date": { "year": 2024, "month": 5, "day": 11 },
+        "station": "S2",
+        "assignments": [
+          ["A", "O1"],
+          ["D", "O2"],
+          ["B", "O3"],
+          ["E", "O4"],
+          ["F", "O5"]
+        ]
+      }
+    },
+    {
+      "day": {
+        "date": { "year": 2024, "month": 5, "day": 12 },
+        "station": "S2",
+        "assignments": [
+          ["F", "O1"],
+          ["B", "O2"],
+          ["D", "O3"],
+          ["E", "O4"],
+          ["C", "O5"]
+        ]
+      }
+    },
+    {
+      "day": {
+        "date": { "year": 2024, "month": 5, "day": 13 },
+        "station": "S2",
+        "assignments": [
+          ["A", "O1"],
+          ["D", "O2"],
+          ["C", "O3"],
+          ["E", "O4"],
+          ["F", "O5"]
+        ]
+      }
+    },
+    {
+      "day": {
+        "date": { "year": 2024, "month": 5, "day": 14 },
+        "station": "S2",
+        "assignments": [
+          ["C", "O1"],
+          ["A", "O2"],
+          ["B", "O3"],
+          ["F", "O4"],
+          ["E", "O5"]
+        ]
+      }
+    },
+    {
+      "day": {
+        "date": { "year": 2024, "month": 5, "day": 15 },
+        "station": "S2",
+        "assignments": [
+          ["F", "O1"],
+          ["B", "O2"],
+          ["D", "O3"],
+          ["E", "O4"],
+          ["C", "O5"]
+        ]
+      }
+    },
+    {
+      "day": {
+        "date": { "year": 2024, "month": 5, "day": 16 },
+        "station": "S2",
+        "assignments": [
+          ["A", "O1"],
+          ["D", "O2"],
+          ["B", "O3"],
+          ["E", "O4"],
+          ["C", "O5"]
+        ]
+      }
+    }
+  ]
+  

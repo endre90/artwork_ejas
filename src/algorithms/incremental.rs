@@ -118,6 +118,7 @@ mod tests {
                 pretty_print_external_assignments(station, &s.external_assignments);
                 pretty_print_competence_matrix(station);
                 pretty_print_preference_matrix(station);
+                // Because it is incrementa, this is now updated and printed in every step
                 // pretty_print_historical_matrix(station, history.clone(), tau);
                 println!("=== SCORING ===");
                 println!("    Offs    : {}", offset);
