@@ -109,6 +109,33 @@ pub fn calculate_static_assignment(
     }
 
     // Constraint 2:
+    // We want exactly one of x_ij for each job j to be true:
+    // Σi(x_ij) = 1
+    // This means job j is assigned to exactly one employee:
+
+    for j in 0..jobs.len() {
+        // Gather all internal-assignment variables x_ij for job j
+        let mut all_vars_for_job = Vec::new();
+        for i in 0..employees.len() {
+            all_vars_for_job.push(x[i][j].clone());
+        }
+
+        // Create a "sum = 1" constraint on these boolean variables
+        let at_most_one_employee_per_job = ast::Bool::pb_eq(
+            &ctx,
+            all_vars_for_job
+                .iter()
+                .map(|var| (var, 1)) // each var contributes '1' if true
+                .collect::<Vec<(&ast::Bool, i32)>>()
+                .as_slice(),
+            1, // sum of x_ij = 1
+        );
+
+        // Assert this constraint in the optimizer
+        optimizer.assert(&at_most_one_employee_per_job);
+    }
+
+    // Constraint 3:
     // For each job j, we want: Σ(x_ij) ≥ 1
     // (summed only over those employees i who are competent for job j).
     // This ensures each job is covered by at least one competent worker.
@@ -142,7 +169,7 @@ pub fn calculate_static_assignment(
         optimizer.assert(&job_covered);
     }
 
-    // Constraint 3:
+    // Constraint 4:
     // We impose x_ij implies c_ij for each employee i and job j.
     // This means if x_ij = true (employee i is assigned to job j),
     // then c_ij must also be true (employee i is competent for job j).

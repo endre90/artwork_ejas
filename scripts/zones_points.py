@@ -11,6 +11,9 @@ def plot_points(data):
     for i, entry in enumerate(data):
         key_id = entry["key_id"]
         points = entry["points"]
+        output_key = entry["output_key"]
+        print(key_id)
+        print(output_key)
 
         # Extract separate lists for omega and alpha
         omegas = [p[0] for p in points]
