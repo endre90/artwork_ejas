@@ -410,7 +410,7 @@ mod tests {
             std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
         let s = "S2";
         // let e = "E0";
-        let path = format!("{}/data/{}_matrix.json", manifest_dir, s);
+        let path = format!("{}/data/{}_matrix_static.json", manifest_dir, s);
 
         let json_content = fs::read_to_string(path)?;
         let matrix: Matrix = serde_json::from_str(&json_content)?;
@@ -454,14 +454,14 @@ mod tests {
 
             // let _ = write_to_file(&zones);
 
-            let points = run_and_group_points(station, offset, 0, 20, 0, 20);
+            let points = run_and_group_points_static(station, offset, 0, 10, 0, 10);
             println!("{:?}", points.len());
             for (k, v) in &points {
                 println!("{:?}", k);
                 println!("{:?}", v);
             }
 
-            let _ = write_to_file_points(&points);
+            let _ = write_to_file_points_static(&points);
 
             
             // println!("{:?}", hashmap.keys());

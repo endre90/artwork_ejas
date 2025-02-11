@@ -490,16 +490,16 @@ mod tests {
     fn test_exteral() -> Result<(), Box<dyn std::error::Error>> {
         let manifest_dir =
             std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
-        let s = "S1";
-        let path = format!("{}/data/{}_matrix.json", manifest_dir, s);
+        let s = "S2";
+        let path = format!("{}/data/{}_matrix_external.json", manifest_dir, s);
 
         let json_content = fs::read_to_string(path)?;
         let matrix: Matrix = serde_json::from_str(&json_content)?;
 
         let offset = 10;
         let omega = 1;
-        let alpha = 1;
-        let beta = 1;
+        let alpha = 4;
+        let beta = 0;
 
         if let Some(station) = matrix.stations.get(s) {
             let s = calculate_external_assignment(station, offset, omega, alpha, beta);
@@ -532,6 +532,16 @@ mod tests {
             println!();
             println!("=== SOLVER TIME ===");
             println!("    {:?}", s.solving_time);
+
+            let points = run_and_group_points_external(station, offset, 0, 10, 0, 10, 0, 10);
+            println!("{:?}", points.len());
+            for (k, v) in &points {
+                println!("{:?}", k);
+                // println!("{:?}", v);
+            }
+
+            let _ = write_to_file_points_external(&points);
+
         }
 
         Ok(())

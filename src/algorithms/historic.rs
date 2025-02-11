@@ -552,9 +552,9 @@ mod tests {
     fn test_historic() -> Result<(), Box<dyn std::error::Error>> {
         let manifest_dir =
             std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
-        let s = "S0";
+        let s = "S2";
         let e = "E0";
-        let path = format!("{}/data/{}_matrix.json", manifest_dir, s);
+        let path = format!("{}/data/{}_matrix_static.json", manifest_dir, s);
 
         let history_path = format!("{}/data/{}_{}_history.json", manifest_dir, s, e);
         let history_content = fs::read_to_string(history_path)?;
@@ -573,13 +573,20 @@ mod tests {
 
         if let Some(station) = matrix.stations.get(s) {
             let s = calculate_historic_assignment(
-                station, history.clone(), offset, omega, alpha, beta, tau, gamma,
+                station,
+                history.clone(),
+                offset,
+                omega,
+                alpha,
+                beta,
+                tau,
+                gamma,
             );
             pretty_print_internal_assignments(station, &s.internal_assignments);
             pretty_print_external_assignments(station, &s.external_assignments);
             pretty_print_competence_matrix(station);
             pretty_print_preference_matrix(station);
-            pretty_print_historical_matrix(station, history, tau);
+            pretty_print_historical_matrix(station, history.clone(), tau);
             println!("=== SCORING ===");
             println!("    Offs    : {}", offset);
             println!(
@@ -610,6 +617,39 @@ mod tests {
             println!();
             println!("=== SOLVER TIME ===");
             println!("    {:?}", s.solving_time);
+
+            let offset = 10;
+            let tau = 10;
+            let omega_min = 0;
+            let omega_max = 10;
+            let alpha_min = 0;
+            let alpha_max = 10;
+            let beta_min = 1000;
+            let beta_max = 1000;
+            let gamma_min = 0;
+            let gamma_max = 10;
+
+            let points = run_and_group_points_historic(
+                station,
+                history.clone(),
+                offset,
+                tau,
+                omega_min,
+                omega_max,
+                alpha_min,
+                alpha_max,
+                beta_min,
+                beta_max,
+                gamma_min,
+                gamma_max,
+            );
+            println!("{:?}", points.len());
+            for (k, v) in &points {
+                println!("{:?}", k);
+                // println!("{:?}", v);
+            }
+
+            let _ = write_to_file_points_historic(&points);
         }
 
         Ok(())
