@@ -648,10 +648,10 @@ mod tests {
     use crate::*;
 
     #[test]
-    fn test_historic() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_ergonomic() -> Result<(), Box<dyn std::error::Error>> {
         let manifest_dir =
             std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
-        let s = "S2";
+        let s = "S6";
         let e = "E0";
         let path = format!("{}/data/{}_matrix_static.json", manifest_dir, s);
 
@@ -664,13 +664,13 @@ mod tests {
         let matrix: Matrix = serde_json::from_str(&json_content)?;
 
         let offset = 10;
-        let omega = 0;
-        let alpha = 1000;
-        let beta = 1000;
+        let omega = 1;
+        let alpha = 50;
+        let beta = 100;
         let tau = 10;
         let gamma = 1;
         let theta = 1;
-        let delta = 0;
+        let delta = 1;
 
         if let Some(station) = matrix.stations.get(s) {
             let s = calculate_ergonomic_assignment(
@@ -727,46 +727,46 @@ mod tests {
             println!("    {:?}", s.solving_time);
 
 
-            let offset = 10;
-            let tau = 10;
-            let omega_min = 0;
-            let omega_max = 10;
-            let alpha_min = 1000;
-            let alpha_max = 1000;
-            let beta_min = 1000;
-            let beta_max = 1000;
-            let gamma_min = 0;
-            let gamma_max = 10;
-            let delta_min = 0;
-            let delta_max = 10;
-            let theta_min = 0;
-            let theta_max = 10;
+            // let offset = 10;
+            // let tau = 10;
+            // let omega_min = 0;
+            // let omega_max = 10;
+            // let alpha_min = 1000;
+            // let alpha_max = 1000;
+            // let beta_min = 1000;
+            // let beta_max = 1000;
+            // let gamma_min = 0;
+            // let gamma_max = 10;
+            // let delta_min = 0;
+            // let delta_max = 10;
+            // let theta_min = 0;
+            // let theta_max = 10;
 
-            let points = run_and_group_points_ergonomic(
-                station,
-                history.clone(),
-                offset,
-                tau,
-                omega_min,
-                omega_max,
-                alpha_min,
-                alpha_max,
-                beta_min,
-                beta_max,
-                gamma_min,
-                gamma_max,
-                delta_min,
-                delta_max,
-                theta_min,
-                theta_max,
-            );
-            println!("{:?}", points.len());
-            for (k, v) in &points {
-                println!("{:?}", k);
-                // println!("{:?}", v);
-            }
+            // let points = run_and_group_points_ergonomic(
+            //     station,
+            //     history.clone(),
+            //     offset,
+            //     tau,
+            //     omega_min,
+            //     omega_max,
+            //     alpha_min,
+            //     alpha_max,
+            //     beta_min,
+            //     beta_max,
+            //     gamma_min,
+            //     gamma_max,
+            //     delta_min,
+            //     delta_max,
+            //     theta_min,
+            //     theta_max,
+            // );
+            // println!("{:?}", points.len());
+            // for (k, v) in &points {
+            //     println!("{:?}", k);
+            //     // println!("{:?}", v);
+            // }
 
-            let _ = write_to_file_points_ergonomic(&points);
+            // let _ = write_to_file_points_ergonomic(&points);
         }
 
         Ok(())

@@ -1,0 +1,157 @@
+{
+    "stations": {
+      "S5": {
+        "ergo_score": {
+          "O1": 2,
+          "O2": 3,
+          "O3": 1,
+          "O4": 2,
+          "O5": 3,
+          "O6": 1,
+          "O7": 2,
+          "O8": 3,
+          "O9": 1,
+          "O10": 2,
+          "O11": 3,
+          "O12": 1,
+          "O13": 2,
+          "O14": 3,
+          "O15": 1,
+          "O16": 2,
+          "O17": 3,
+          "O18": 1,
+          "O19": 2,
+          "O20": 3
+        },
+        "people": [
+          {
+            "name": "A",
+            "role": "TeamLeader",
+            "competences": ["O1", "O5", "O10"],
+            "preferences": ["O5"]
+          },
+          {
+            "name": "B",
+            "role": "Operator",
+            "competences": ["O2", "O4"],
+            "preferences": ["O4"]
+          },
+          {
+            "name": "C",
+            "role": "Operator",
+            "competences": ["O3", "O6", "O9"],
+            "preferences": ["O6"]
+          },
+          {
+            "name": "D",
+            "role": "Operator",
+            "competences": ["O7", "O8"],
+            "preferences": ["O8"]
+          },
+          {
+            "name": "E",
+            "role": "Operator",
+            "competences": ["O2", "O10", "O14"],
+            "preferences": ["O10"]
+          },
+          {
+            "name": "F",
+            "role": "Operator",
+            "competences": ["O1", "O3"],
+            "preferences": ["O3"]
+          },
+          {
+            "name": "G",
+            "role": "Operator",
+            "competences": ["O5", "O7", "O11"],
+            "preferences": ["O7"]
+          },
+          {
+            "name": "H",
+            "role": "Operator",
+            "competences": ["O4", "O8", "O12"],
+            "preferences": ["O8"]
+          },
+          {
+            "name": "I",
+            "role": "Operator",
+            "competences": ["O9", "O13"],
+            "preferences": ["O9"]
+          },
+          {
+            "name": "J",
+            "role": "Operator",
+            "competences": ["O10", "O14", "O15"],
+            "preferences": ["O10"]
+          },
+          {
+            "name": "K",
+            "role": "Operator",
+            "competences": ["O2", "O5", "O8"],
+            "preferences": ["O5"]
+          },
+          {
+            "name": "L",
+            "role": "Operator",
+            "competences": ["O1", "O4", "O7", "O11"],
+            "preferences": ["O7"]
+          },
+          {
+            "name": "M",
+            "role": "Operator",
+            "competences": ["O3", "O6", "O9", "O12"],
+            "preferences": ["O6"]
+          },
+          {
+            "name": "N",
+            "role": "Operator",
+            "competences": ["O8", "O10"],
+            "preferences": ["O10"]
+          },
+          {
+            "name": "O",
+            "role": "Operator",
+            "competences": ["O13", "O15"],
+            "preferences": ["O15"]
+          },
+          {
+            "name": "P",
+            "role": "Operator",
+            "competences": ["O2", "O7", "O14"],
+            "preferences": ["O7"]
+          },
+          {
+            "name": "Q",
+            "role": "Operator",
+            "competences": ["O3", "O8", "O12"],
+            "preferences": ["O8"]
+          },
+          {
+            "name": "R",
+            "role": "Operator",
+            "competences": ["O1", "O9"],
+            "preferences": ["O9"]
+          },
+          {
+            "name": "S",
+            "role": "Operator",
+            "competences": ["O4", "O11", "O16"],
+            "preferences": ["O11"]
+          },
+          {
+            "name": "T",
+            "role": "Operator",
+            "competences": ["O5", "O10", "O17"],
+            "preferences": ["O10"]
+          },
+          {
+            "name": "U",
+            "role": "Operator",
+            "competences": ["O6", "O13", "O18"],
+            "preferences": ["O13"]
+          }
+        ]
+      }
+    }
+  }
+  

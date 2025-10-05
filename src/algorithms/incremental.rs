@@ -77,9 +77,9 @@ mod tests {
     fn test_incremental() -> Result<(), Box<dyn std::error::Error>> {
         let manifest_dir =
             std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
-        let s = "S0";
+        let s = "S2";
         let e = "E0";
-        let path = format!("{}/data/{}_matrix.json", manifest_dir, s);
+        let path = format!("{}/data/{}_matrix_static.json", manifest_dir, s);
 
         let history_path = format!("{}/data/{}_{}_history.json", manifest_dir, s, e);
         let history_content = fs::read_to_string(history_path)?;
@@ -89,11 +89,11 @@ mod tests {
         let json_content = fs::read_to_string(path)?;
         let matrix: Matrix = serde_json::from_str(&json_content)?;
 
-        let horizon = 7;
+        let horizon = 8;
         let offset = 10;
         let omega = 1;
-        let alpha = 1;
-        let beta = 5;
+        let alpha = 50;
+        let beta = 100;
         let tau = 10;
         let gamma = 1;
         let theta = 1;
@@ -116,45 +116,45 @@ mod tests {
             for s in solutions {
                 pretty_print_internal_assignments(station, &s.internal_assignments);
                 pretty_print_external_assignments(station, &s.external_assignments);
-                pretty_print_competence_matrix(station);
-                pretty_print_preference_matrix(station);
+                // pretty_print_competence_matrix(station);
+                // pretty_print_preference_matrix(station);
                 // Because it is incrementa, this is now updated and printed in every step
                 // pretty_print_historical_matrix(station, history.clone(), tau);
-                println!("=== SCORING ===");
-                println!("    Offs    : {}", offset);
-                println!(
-                    "    Pref    : {}(omega) x {} = {}",
-                    omega, s.preference_reward_score, s.weighted_preference_reward_score
-                );
-                println!(
-                    "    Lead    : {}(alpha) x {} = {}",
-                    alpha, s.leader_penalty_score, s.weighted_leader_penalty_score
-                );
-                println!(
-                    "    Exte    : {}(beta) x {} = {}",
-                    beta, s.external_penalty_score, s.weighted_external_penalty_score
-                );
-                println!(
-                    "    Hist    : {}(gamma) x {} = {}",
-                    gamma, s.historical_penalty_score, s.weighted_historical_penalty_score
-                );
-                println!(
-                    "    Ergo    : {}(delta) x {} = {}",
-                    delta, s.ergonomics_reward_score, s.weighted_ergonomics_reward_score
-                );
-                println!(
-                    "    Total   : {}(Offs) + {}(Pref) - {}(Lead) - {}(Exte) - {}(Hist) + {}(Ergo)= {}",
-                    offset,
-                    s.weighted_preference_reward_score,
-                    s.weighted_leader_penalty_score,
-                    s.weighted_external_penalty_score,
-                    s.weighted_historical_penalty_score,
-                    s.weighted_ergonomics_reward_score,
-                    s.objective_score
-                );
-                println!();
-                println!("=== SOLVER TIME ===");
-                println!("    {:?}", s.solving_time);
+                // println!("=== SCORING ===");
+                // println!("    Offs    : {}", offset);
+                // println!(
+                //     "    Pref    : {}(omega) x {} = {}",
+                //     omega, s.preference_reward_score, s.weighted_preference_reward_score
+                // );
+                // println!(
+                //     "    Lead    : {}(alpha) x {} = {}",
+                //     alpha, s.leader_penalty_score, s.weighted_leader_penalty_score
+                // );
+                // println!(
+                //     "    Exte    : {}(beta) x {} = {}",
+                //     beta, s.external_penalty_score, s.weighted_external_penalty_score
+                // );
+                // println!(
+                //     "    Hist    : {}(gamma) x {} = {}",
+                //     gamma, s.historical_penalty_score, s.weighted_historical_penalty_score
+                // );
+                // println!(
+                //     "    Ergo    : {}(delta) x {} = {}",
+                //     delta, s.ergonomics_reward_score, s.weighted_ergonomics_reward_score
+                // );
+                // println!(
+                //     "    Total   : {}(Offs) + {}(Pref) - {}(Lead) - {}(Exte) - {}(Hist) + {}(Ergo)= {}",
+                //     offset,
+                //     s.weighted_preference_reward_score,
+                //     s.weighted_leader_penalty_score,
+                //     s.weighted_external_penalty_score,
+                //     s.weighted_historical_penalty_score,
+                //     s.weighted_ergonomics_reward_score,
+                //     s.objective_score
+                // );
+                // println!();
+                // println!("=== SOLVER TIME ===");
+                // println!("    {:?}", s.solving_time);
             }
         }
 

@@ -449,11 +449,11 @@ mod tests {
 
     #[test]
     fn test_ergonomic() -> Result<(), Box<dyn std::error::Error>> {
-        let station = "S0".to_string();
-        let example = "E1".to_string();
+        let station = "S2".to_string();
+        let example = "E0".to_string();
         let manifest_dir =
             std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
-        let matrix_path = format!("{}/data/{}_matrix.json", manifest_dir, station);
+        let matrix_path = format!("{}/data/{}_matrix_static.json", manifest_dir, station);
         let matrix_content = fs::read_to_string(matrix_path)?;
         let matrix: Matrix = serde_json::from_str(&matrix_content)?;
 
@@ -462,17 +462,27 @@ mod tests {
         let history_wrapper: Vec<DayWrapper> = serde_json::from_str(&history_content)?;
         let history: Vec<Day> = history_wrapper.into_iter().map(|dw| dw.day).collect();
 
-        let horizon: usize = 3; // For how many days to plan ahead (the planning horizon (1 means only assignment for today))
-        let offset: u32 = 10000; // Add to objective to get a positive integer result (just for aesthetics)
-        let omega: u32 = 1000; // How strongly preference considerations influence the objective function
-        let alpha: u32 = 10; // How strongly to discourage leader usage
-        let beta: u32 = 1000; // How strongly to discourage external operator usage
-        let tau: u32 = 10; // Number of days to consider in the historical data (from last day to last day - tau)
-        let gamma: u32 = 1; // how strongly to penalize assigning the same employee–job pair that was frequently assigned in the past tau days
-        let delta: u32 = 0; // Ergonomics weight
-        let theta: u32 = 0; // Weight controlling how the historical count reduces the ergonomics benefit of a job for a given employee.
+        let horizon = 3;
+        let offset = 10;
+        let omega = 1;
+        let alpha = 50;
+        let beta = 10000;
+        let tau = 10;
+        let gamma = 1;
+        let theta = 1;
+        let delta = 1;
 
-        if let Some(station_1) = matrix.stations.get("S0") {
+        // let horizon: usize = 8; // For how many days to plan ahead (the planning horizon (1 means only assignment for today))
+        // let offset: u32 = 100; // Add to objective to get a positive integer result (just for aesthetics)
+        // let omega: u32 = 1000; // How strongly preference considerations influence the objective function
+        // let alpha: u32 = 10; // How strongly to discourage leader usage
+        // let beta: u32 = 1000; // How strongly to discourage external operator usage
+        // let tau: u32 = 10; // Number of days to consider in the historical data (from last day to last day - tau)
+        // let gamma: u32 = 1; // how strongly to penalize assigning the same employee–job pair that was frequently assigned in the past tau days
+        // let delta: u32 = 0; // Ergonomics weight
+        // let theta: u32 = 0; // Weight controlling how the historical count reduces the ergonomics benefit of a job for a given employee.
+
+        if let Some(station_1) = matrix.stations.get("S2") {
             let s = calculate_complete_assignment(
                 station_1, history, horizon, offset, omega, alpha, beta, tau, gamma, delta, theta,
             );
