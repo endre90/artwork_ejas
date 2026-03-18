@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::Day;
+use crate::{Day, Pass};
 
 pub fn build_competence_matrix(
     competence_map: &Vec<(String, Vec<String>)>,
@@ -57,6 +57,37 @@ pub fn build_preference_matrix(
 
 pub fn build_historical_count_matrix(
     history_of_assignments: Vec<Day>,
+    period: usize,
+    employees: &Vec<String>,
+    jobs: &Vec<String>,
+) -> Vec<Vec<u32>> {
+    // Initialize the historic count matrix with zeros
+    let mut h_matrix = vec![vec![0; jobs.len()]; employees.len()];
+
+    // Calculate how far back we go
+    let start_index = history_of_assignments.len().saturating_sub(period);
+
+    // For each day in the specified slice
+    for day in &history_of_assignments[start_index..] {
+        // `day.assignments` is already a Vec<(String, String)>
+        // so iteration order is the insertion order in that vector.
+        for (employee, job) in &day.assignments {
+            // 1) Find the index of the employee in `employees`
+            if let Some(i) = employees.iter().position(|e| e == employee) {
+                // 2) Find the index of the job in `jobs`
+                if let Some(j_pos) = jobs.iter().position(|job_name| job_name == job) {
+                    // 3) Increment the counter
+                    h_matrix[i][j_pos] += 1;
+                }
+            }
+        }
+    }
+
+    h_matrix
+}
+
+pub fn build_historical_count_matrix_with_passes(
+    history_of_assignments: Vec<Pass>,
     period: usize,
     employees: &Vec<String>,
     jobs: &Vec<String>,

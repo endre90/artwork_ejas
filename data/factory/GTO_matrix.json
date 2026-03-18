@@ -1,0 +1,84 @@
+{
+    "stations": {
+      "S1": {
+        "ergo_score": {
+          "O1": 3,
+          "O2": 3,
+          "O3": 2,
+          "O4": 2,
+          "O5": 2,
+          "O6": 1,
+          "O7": 2,
+          "O8": 1
+        },
+        "people": [
+          {
+            "name": "A",
+            "role": "TeamLeader",
+            "competences": ["O1", "O2", "O3", "O4", "O5", "O7", "O6", "O8"],
+            "preferences": []
+          },
+          {
+            "name": "B",
+            "role": "Operator",
+            "competences": ["O1", "O2", "O3", "O4", "O5", "O8"],
+            "preferences": []
+          },
+          {
+            "name": "C",
+            "role": "Operator",
+            "competences": ["O1", "O2", "O3", "O4", "O5", "O7", "O6", "O8"],
+            "preferences": []
+          },
+          {
+            "name": "D",
+            "role": "Operator",
+            "competences": ["O1", "O2", "O3", "O4", "O5", "O7", "O6"],
+            "preferences": []
+          },
+          {
+            "name": "E",
+            "role": "Operator",
+            "competences": ["O1", "O2", "O3", "O4", "O5", "O7", "O6", "O8"],
+            "preferences": []
+          },
+          {
+            "name": "F",
+            "role": "Operator",
+            "competences": ["O1", "O2", "O4", "O5", "O7", "O6", "O8"],
+            "preferences": []
+          },
+          {
+            "name": "G",
+            "role": "Operator",
+            "competences": ["O1", "O2", "O3", "O4", "O5", "O8"],
+            "preferences": []
+          },
+          {
+            "name": "H",
+            "role": "Operator",
+            "competences": ["O2", "O3", "O4", "O5", "O7", "O6", "O8"],
+            "preferences": []
+          },
+          {
+            "name": "I",
+            "role": "Operator",
+            "competences": ["O1", "O3", "O4", "O5", "O8"],
+            "preferences": []
+          },
+          {
+            "name": "J",
+            "role": "Operator",
+            "competences": ["O2", "O4", "O5", "O8"],
+            "preferences": []
+          },
+          {
+            "name": "K",
+            "role": "Operator",
+            "competences": ["O2", "O4", "O5", "O8"],
+            "preferences": []
+          }
+        ]
+      }
+    }
+  }

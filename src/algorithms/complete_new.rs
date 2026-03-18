@@ -453,11 +453,11 @@ mod tests {
         let example = "E0".to_string();
         let manifest_dir =
             std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
-        let matrix_path = format!("{}/data/{}_matrix_static.json", manifest_dir, station);
+        let matrix_path = format!("{}/data/synthetic/{}_matrix_static.json", manifest_dir, station);
         let matrix_content = fs::read_to_string(matrix_path)?;
         let matrix: Matrix = serde_json::from_str(&matrix_content)?;
 
-        let history_path = format!("{}/data/{}_{}_history.json", manifest_dir, station, example);
+        let history_path = format!("{}/data/synthetic/{}_{}_history.json", manifest_dir, station, example);
         let history_content = fs::read_to_string(history_path)?;
         let history_wrapper: Vec<DayWrapper> = serde_json::from_str(&history_content)?;
         let history: Vec<Day> = history_wrapper.into_iter().map(|dw| dw.day).collect();

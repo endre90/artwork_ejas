@@ -410,7 +410,7 @@ mod tests {
             std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
         let s = "S2";
         // let e = "E0";
-        let path = format!("{}/data/{}_matrix_static.json", manifest_dir, s);
+        let path = format!("{}/data/synthetic/{}_matrix_static.json", manifest_dir, s);
 
         let json_content = fs::read_to_string(path)?;
         let matrix: Matrix = serde_json::from_str(&json_content)?;

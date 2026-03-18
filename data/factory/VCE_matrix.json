@@ -1,0 +1,118 @@
+    {
+    "stations": {
+      "S1": {
+        "ergo_score": {
+          "O1": 1,
+          "O2": 2,
+          "O3": 2,
+          "O4": 3, 
+          "O5": 3,
+          "O6": 4,
+          "O7": 3,
+          "O8": 3,
+          "O9": 2,
+          "O10": 3,
+          "O11": 4,
+          "O12": 3
+        },
+        "people": [
+          {
+            "name": "A",
+            "role": "Operator", 
+            "competences": ["O1", "O2", "O3", "O4", "O5", "O6", "O7", "O10", "O11", "O12"],
+            "preferences": ["O4", "O12"]
+          },
+          {
+            "name": "B",
+            "role": "Operator", 
+            "competences": ["O1", "O2", "O3", "O4", "O5", "O6", "O7", "O8", "O9", "O10", "O11", "O12"],
+            "preferences": ["O8", "O12"]
+          },
+          {
+            "name": "C",
+            "role": "Operator", 
+            "competences": ["O1", "O2", "O3", "O4", "O5", "O6", "O7", "O8", "O10", "O11", "O12"],
+            "preferences": ["O8", "O11"]
+          },
+          {
+            "name": "D",
+            "role": "Operator", 
+            "competences": ["O1", "O2", "O3", "O4", "O5", "O6", "O7", "O8", "O10", "O11", "O12"],
+            "preferences": ["O8", "O6"]
+          },
+          {
+            "name": "E",
+            "role": "Operator", 
+            "competences": ["O1", "O2", "O3", "O4", "O5", "O6", "O7", "O10", "O11", "O12"],
+            "preferences": ["O10", "O6"]
+          },
+          {
+            "name": "F",
+            "role": "Operator", 
+            "competences": ["O1", "O2", "O3", "O4", "O5", "O6", "O7", "O8", "O9", "O10", "O11", "O12"],
+            "preferences": ["O9", "O7"]
+          },
+          {
+            "name": "G",
+            "role": "Operator", 
+            "competences": ["O1", "O2", "O3", "O4", "O5", "O6", "O7", "O8", "O9", "O10", "O11", "O12"],
+            "preferences": ["O9", "O8"]
+          },
+          {
+            "name": "H",
+            "role": "Operator", 
+            "competences": ["O1", "O2", "O3", "O4", "O5", "O6", "O7", "O10", "O11", "O12"],
+            "preferences": ["O7", "O11"]
+          },
+          {
+            "name": "I",
+            "role": "Operator", 
+            "competences": ["O1", "O2", "O3", "O4", "O5", "O6", "O7", "O10", "O11", "O12"],
+            "preferences": ["O6", "O11"]
+          },
+          {
+            "name": "J",
+            "role": "Operator", 
+            "competences": ["O1", "O2", "O3", "O4", "O5", "O6", "O7", "O10", "O11", "O12"],
+            "preferences": ["O11", "O12"]
+          },
+          {
+            "name": "K",
+            "role": "Operator", 
+            "competences": ["O1", "O2", "O3", "O4", "O5", "O6", "O7", "O10", "O11", "O12"],
+            "preferences": ["O12", "O6"]
+          },
+          {
+            "name": "L",
+            "role": "Operator", 
+            "competences": ["O1", "O2", "O3", "O4", "O5", "O6", "O7", "O8", "O9", "O10", "O11", "O12"],
+            "preferences": ["O9", "O8"]
+          },
+          {
+            "name": "M",
+            "role": "Operator", 
+            "competences": ["O1", "O2", "O3", "O4", "O5", "O6", "O7", "O10", "O11", "O12"],
+            "preferences": ["O6", "O12"]
+          },
+          {
+            "name": "N",
+            "role": "Operator", 
+            "competences": ["O1", "O2", "O3", "O4", "O5", "O6", "O7", "O8", "O10", "O11", "O12"],
+            "preferences": ["O11", "O4"]
+          },
+          {
+            "name": "O",
+            "role": "Operator", 
+            "competences": ["O1", "O2", "O3", "O4", "O5", "O6", "O7", "O8", "O9", "O10", "O11", "O12"],
+            "preferences": ["O9", "O8"]
+          },
+          {
+            "name": "P",
+            "role": "Operator", 
+            "competences": ["O1", "O2", "O3", "O4", "O5", "O6", "O7", "O8", "O9", "O10", "O11", "O12"],
+            "preferences": ["O9", "O6"]
+          }
+        ]
+      }
+    }
+  }

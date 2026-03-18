@@ -39,6 +39,14 @@ pub struct Day {
     pub assignments: Vec<(String, String)>, // (employee, job)
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct Pass {
+    pub date: Date,
+    pub pass: u8,
+    pub station: String,
+    pub assignments: Vec<(String, String)>, // (employee, job)
+}
+
 #[derive(Debug, Deserialize)]
 pub struct DayWrapper {
     pub day: Day,
