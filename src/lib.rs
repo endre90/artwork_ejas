@@ -6,7 +6,7 @@ pub use utils::loading::*;
 pub use utils::errors::*; 
 pub use utils::matrix::*;
 pub use utils::printing::*;
-pub use utils::visualization::*;
+// pub use utils::visualization::*;
 
 pub mod algorithms;
 pub use crate::algorithms::r#static::*;
@@ -15,4 +15,4 @@ pub use crate::algorithms::historic::*;
 pub use crate::algorithms::ergonomic::*;
 pub use crate::algorithms::complete_new::*;
 // pub use crate::algorithms::complete::*;
-pub use crate::algorithms::incremental::*;
+// pub use crate::algorithms::incremental::*;

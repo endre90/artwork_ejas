@@ -533,14 +533,14 @@ mod tests {
             println!("=== SOLVER TIME ===");
             println!("    {:?}", s.solving_time);
 
-            let points = run_and_group_points_external(station, offset, 0, 10, 0, 10, 0, 10);
-            println!("{:?}", points.len());
-            for (k, v) in &points {
-                println!("{:?}", k);
-                // println!("{:?}", v);
-            }
+            // let points = run_and_group_points_external(station, offset, 0, 10, 0, 10, 0, 10);
+            // println!("{:?}", points.len());
+            // for (k, v) in &points {
+            //     println!("{:?}", k);
+            //     // println!("{:?}", v);
+            // }
 
-            let _ = write_to_file_points_external(&points);
+            // let _ = write_to_file_points_external(&points);
 
         }
 

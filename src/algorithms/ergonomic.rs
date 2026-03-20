@@ -40,6 +40,10 @@ pub fn calculate_ergonomic_assignment(
     gamma: u32, // how strongly to penalize assigning the same employee–job pair that was frequently assigned in the past tau days
     delta: u32, // Ergonomics weight
     theta: u32, // Weight controlling how the historical count reduces the ergonomics benefit of a job for a given employee.
+    forced_assignments: &[(String, String)],
+    loaned_employees: &[String],
+    absent_employees: &[String],
+    special_training_employees: &[String],
 ) -> ErgonomicAssignmentSolution {
     let mut jobs = vec![];
     let mut employees = vec![];
@@ -551,6 +555,60 @@ pub fn calculate_ergonomic_assignment(
     // let weighted_ergonomics_reward_tracker = Int::new_const(&ctx, "weighted_ergonomics_reward");
     // optimizer.assert(&weighted_ergonomics_reward._eq(&weighted_ergonomics_reward_tracker));
 
+    // Force specific (employee, job) pairings
+    for (emp_name, job_name) in forced_assignments {
+        // Find the matching indices
+        if let (Some(i), Some(j)) = (
+            employees.iter().position(|e| e == emp_name),
+            jobs.iter().position(|job| job == job_name),
+        ) {
+            // Assert that this specific boolean MUST be true
+            optimizer.assert(&x[i][j]._eq(&Bool::from_bool(&ctx, true)));
+        } else {
+            log::warn!(
+                "Tried to force assignment for unknown employee or job: {} -> {}",
+                emp_name,
+                job_name
+            );
+        }
+    }
+
+    // Force loaned-out employees (they get NO jobs today)
+    for emp_name in loaned_employees {
+        if let Some(i) = employees.iter().position(|e| e == emp_name) {
+            // Assert that EVERY job for this employee MUST be false
+            for j in 0..jobs.len() {
+                optimizer.assert(&x[i][j]._eq(&Bool::from_bool(&ctx, false)));
+            }
+        } else {
+            log::warn!("Unknown employee: {}", emp_name);
+        }
+    }
+
+    // Force absent employees (they get NO jobs today)
+    for emp_name in absent_employees {
+        if let Some(i) = employees.iter().position(|e| e == emp_name) {
+            // Assert that EVERY job for this employee MUST be false
+            for j in 0..jobs.len() {
+                optimizer.assert(&x[i][j]._eq(&Bool::from_bool(&ctx, false)));
+            }
+        } else {
+            log::warn!("Unknown employee: {}", emp_name);
+        }
+    }
+
+    // Force special training employees (they get NO jobs today)
+    for emp_name in special_training_employees {
+        if let Some(i) = employees.iter().position(|e| e == emp_name) {
+            // Assert that EVERY job for this employee MUST be false
+            for j in 0..jobs.len() {
+                optimizer.assert(&x[i][j]._eq(&Bool::from_bool(&ctx, false)));
+            }
+        } else {
+            log::warn!("Unknown employee: {}", emp_name);
+        }
+    }
+
     // Add offset to the objective
     let offset_z3 = Int::from_i64(&ctx, offset as i64);
 
@@ -758,6 +816,11 @@ mod tests {
         let theta = 1;
         let delta = 1;
 
+        let forced_assignments = [
+            // ("O".to_string(), "O3".to_string()),
+            // ("P".to_string(), "O6".to_string()),
+        ];
+
         if let Some(station) = matrix.stations.get("CE") {
             let s = calculate_ergonomic_assignment(
                 station,
@@ -770,6 +833,10 @@ mod tests {
                 gamma,
                 delta,
                 theta,
+                &forced_assignments,
+                &["O".to_string()],
+                &["A".to_string()], // A is absent for example...
+                &["P".to_string()]
             );
             pretty_print_internal_assignments(station, &s.internal_assignments);
             pretty_print_external_assignments(station, &s.external_assignments);

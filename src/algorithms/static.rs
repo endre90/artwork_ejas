@@ -455,14 +455,14 @@ mod tests {
 
             // let _ = write_to_file(&zones);
 
-            let points = run_and_group_points_static(station, offset, 0, 10, 0, 10);
-            println!("{:?}", points.len());
-            for (k, v) in &points {
-                println!("{:?}", k);
-                println!("{:?}", v);
-            }
+            // let points = run_and_group_points_static(station, offset, 0, 10, 0, 10);
+            // println!("{:?}", points.len());
+            // for (k, v) in &points {
+            //     println!("{:?}", k);
+            //     println!("{:?}", v);
+            // }
 
-            let _ = write_to_file_points_static(&points);
+            // let _ = write_to_file_points_static(&points);
 
             
             // println!("{:?}", hashmap.keys());
