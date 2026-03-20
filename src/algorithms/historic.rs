@@ -552,11 +552,11 @@ mod tests {
     fn test_historic() -> Result<(), Box<dyn std::error::Error>> {
         let manifest_dir =
             std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
-        let s = "S2";
-        let e = "E0";
-        let path = format!("{}/data/synthetic/{}_matrix_static.json", manifest_dir, s);
+        // let s = "S2";
+        // let e = "E0";
+        let path = format!("{}/data/factory/VCE_matrix.json", manifest_dir);
 
-        let history_path = format!("{}/data/synthetic/{}_{}_history.json", manifest_dir, s, e);
+        let history_path = format!("{}/data/factory/VCE_history.json", manifest_dir);
         let history_content = fs::read_to_string(history_path)?;
         let history_wrapper: Vec<DayWrapper> = serde_json::from_str(&history_content)?;
         let history: Vec<Day> = history_wrapper.into_iter().map(|dw| dw.day).collect();
@@ -568,10 +568,10 @@ mod tests {
         let omega = 1;
         let alpha = 1;
         let beta = 5;
-        let tau = 10;
+        let tau = 2;
         let gamma = 1;
 
-        if let Some(station) = matrix.stations.get(s) {
+        if let Some(station) = matrix.stations.get("CE") {
             let s = calculate_historic_assignment(
                 station,
                 history.clone(),
@@ -618,38 +618,39 @@ mod tests {
             println!("=== SOLVER TIME ===");
             println!("    {:?}", s.solving_time);
 
-            let offset = 10;
-            let tau = 10;
-            let omega_min = 0;
-            let omega_max = 10;
-            let alpha_min = 0;
-            let alpha_max = 10;
-            let beta_min = 1000;
-            let beta_max = 1000;
-            let gamma_min = 0;
-            let gamma_max = 10;
+            // let offset = 10;
+            // let tau = 10;
+            // let omega_min = 0;
+            // let omega_max = 10;
+            // let alpha_min = 0;
+            // let alpha_max = 10;
+            // let beta_min = 1000;
+            // let beta_max = 1000;
+            // let gamma_min = 0;
+            // let gamma_max = 10;
 
-            let points = run_and_group_points_historic(
-                station,
-                history.clone(),
-                offset,
-                tau,
-                omega_min,
-                omega_max,
-                alpha_min,
-                alpha_max,
-                beta_min,
-                beta_max,
-                gamma_min,
-                gamma_max,
-            );
-            println!("{:?}", points.len());
-            for (k, v) in &points {
-                println!("{:?}", k);
-                // println!("{:?}", v);
-            }
+            // This is for the whole solutions space:
+            // let points = run_and_group_points_historic(
+            //     station,
+            //     history.clone(),
+            //     offset,
+            //     tau,
+            //     omega_min,
+            //     omega_max,
+            //     alpha_min,
+            //     alpha_max,
+            //     beta_min,
+            //     beta_max,
+            //     gamma_min,
+            //     gamma_max,
+            // );
+            // println!("{:?}", points.len());
+            // for (k, v) in &points {
+            //     println!("{:?}", k);
+            //     // println!("{:?}", v);
+            // }
 
-            let _ = write_to_file_points_historic(&points);
+            // let _ = write_to_file_points_historic(&points);
         }
 
         Ok(())

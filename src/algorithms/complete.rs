@@ -508,9 +508,9 @@ mod tests {
             std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
         let s = "S2";
         let e = "E0";
-        let path = format!("{}/data/{}_matrix_static.json", manifest_dir, s);
+        let path = format!("{}/data/synthetic/{}_matrix_static.json", manifest_dir, s);
 
-        let history_path = format!("{}/data/{}_{}_history.json", manifest_dir, s, e);
+        let history_path = format!("{}/data/synthetic/{}_{}_history.json", manifest_dir, s, e);
         let history_content = fs::read_to_string(history_path)?;
         let history_wrapper: Vec<DayWrapper> = serde_json::from_str(&history_content)?;
         let history: Vec<Day> = history_wrapper.into_iter().map(|dw| dw.day).collect();

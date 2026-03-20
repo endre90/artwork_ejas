@@ -4,6 +4,7 @@
 # from matplotlib.colors import ListedColormap
 # import matplotlib.patches as mpatches
 # from datetime import date, timedelta
+# from matplotlib.patches import Patch
 
 # def process_data(data):
 #     # Sort data chronologically
@@ -99,16 +100,15 @@
 
 # def plot_assignment_history(text_mat, int_mat, days, operators):
 #     # Dynamic sizing so it perfectly fits however many compressed rows we generate
-#     # fig, ax = plt.subplots(figsize=(max(8, len(operators) * 1.2), max(5, len(days) * 0.6)))
 #     fig, ax = plt.subplots(figsize=(len(operators) * 0.75, len(days) * 0.3))
 
 #     # Reusing the established color palette + White for "Unknown"
 #     colors = [
-#         "#a1d99b", # 0: Soft Green (Operations)
-#         "#9e9ac8", # 1: Soft Purple (Training)
-#         "#e17674", # 2: Tuned-down Red (Leave)
-#         "#f5f5f5", # 3: Neutral Gray (Extra)
-#         "#ffffff", # 4: White (Unknown/Missing)
+#         "#a1d99b", 
+#         "#fdbb84", 
+#         "#9e9ac8", 
+#         "#e17674", 
+#         "#ffffff", 
 #     ]
 #     cmap = ListedColormap(colors)
 
@@ -116,14 +116,20 @@
 #     im = ax.imshow(int_mat, aspect='auto', cmap=cmap, interpolation='nearest')
 #     im.set_clim(-0.5, 4.5)
 
-#     # Configure Axes
+#     # Configure Axes (Removed fontweight='bold' for labels and ticks)
 #     ax.set_xticks(np.arange(len(operators)))
 #     ax.set_yticks(np.arange(len(days)))
-#     ax.set_xticklabels(operators, fontsize=10, fontweight='bold')
-#     ax.set_yticklabels(days, fontsize=10, fontweight='bold')
+#     ax.set_xticklabels(operators, fontsize=11)
+#     ax.set_yticklabels(days, fontsize=11)
 
-#     ax.set_xlabel("Operators", fontweight='bold', labelpad=10)
-#     ax.set_ylabel("Date Timeline", fontweight='bold', labelpad=10)
+#     ax.set_xlabel("Operators", labelpad=10, fontsize=13)
+#     ax.set_ylabel("Date Timeline", labelpad=10, fontsize=13)
+
+#     #     ax.set_xticklabels(operators, fontsize=11)
+#     # ax.set_yticklabels(date_labels, fontsize=11)
+
+#     # ax.set_xlabel("Operators", labelpad=15, fontsize=13)
+#     # ax.set_ylabel("Dates", labelpad=15, fontsize=13)
 
 #     # Remove outer black box (spines)
 #     for spine in ax.spines.values():
@@ -135,7 +141,7 @@
 #     ax.grid(which='minor', color='white', linestyle='-', linewidth=2)
 #     ax.tick_params(which="both", bottom=False, left=False)
 
-#     # Overlay the text labels and hatching
+#     # Overlay the text labels and hatching (Restored fontweight='bold')
 #     for i in range(len(days)):         # rows
 #         for j in range(len(operators)): # cols
 #             text = text_mat[i, j]
@@ -150,18 +156,35 @@
 #                 # Normal dark text for active assignments
 #                 ax.text(j, i, text, ha='center', va='center', color='#333333', fontsize=10, fontweight='bold')
 
-#     # Create Custom Legend
-#     legend_labels = ["Operation", "Training (T)", "Leave (L)", "Extra (E)"]
-#     legend_patches = [mpatches.Patch(facecolor=colors[i], edgecolor='white', label=legend_labels[i]) for i in range(4)]
-    
-#     # Add the special hatched patch for Unknown
-#     legend_patches.append(mpatches.Patch(facecolor='#ffffff', edgecolor='#a6a6a6', hatch='////', label='Unknown (U)'))
-    
-#     ax.legend(handles=legend_patches, loc='lower center', bbox_to_anchor=(0.5, 1.02), ncol=5, frameon=False, fontsize=10)
+#     # # Create Custom Legend
+#     # legend_labels = ["Operation", "Training (T)", "Loaned out (L)", "Absent (E)"]
 
-#     ax.set_title("VCE Station: Assignment History", fontsize=16, fontweight='bold', pad=45)
+
+#     # legend_patches = [mpatches.Patch(facecolor=colors[i], edgecolor='white', label=legend_labels[i]) for i in range(4)]
     
-#     plt.tight_layout()
+#     # # Add the special hatched patch for Unknown
+#     # legend_patches.append(mpatches.Patch(facecolor='#ffffff', edgecolor='#a6a6a6', hatch='////', label='Unknown (U)'))
+
+#     legend_elements = [
+#         Patch(facecolor='#aec7e8', edgecolor='white', label='TL (Team Leader)'),
+#         Patch(facecolor='#a1d99b', edgecolor='white', label='OX (Operation)'),
+#         Patch(facecolor='#e17674', edgecolor='white', label='E (Absent)'),
+#         Patch(facecolor='#fdbb84', edgecolor='white', label='T (Training)'),
+#         Patch(facecolor='#9e9ac8', edgecolor='white', label='L (Loaned out)'),
+#         Patch(facecolor='#ffffff', edgecolor='#a6a6a6', hatch='////', label='U (Unknown)')
+#     ]
+    
+#     # Legend placed safely underneath the title
+#     ax.legend(handles=legend_elements, loc='lower center', bbox_to_anchor=(0.5, 1.02), ncol=7, frameon=False, fontsize=10)
+    
+#     # ax.legend(handles=legend_patches, loc='lower center', bbox_to_anchor=(0.5, 1.02), ncol=5, frameon=False, fontsize=10)
+
+#     # Add the title text below the figure (Bumped up the y-coordinate to 0.04 to bring it closer)
+#     # ax.set_title("VCE Station: Assignment History", fontsize=16, fontweight='bold', pad=45)
+#     ax.set_title("Volvo CE Station Daily Assignments in January, February, and March 2026", fontsize=16, pad=40)
+    
+#     # Adjusted rect to tighten the gap between the axes and the text
+#     plt.tight_layout(rect=[0, 0.06, 1, 1])
 #     plt.savefig("history_vce.pdf", bbox_inches="tight")
 #     plt.show()
 
@@ -184,6 +207,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 import matplotlib.patches as mpatches
 from datetime import date, timedelta
+from matplotlib.patches import Patch
 
 def process_data(data):
     # Sort data chronologically
@@ -192,13 +216,16 @@ def process_data(data):
     # Extract unique operators
     operators = sorted(list(set(op[0] for d in data_sorted for op in d["day"]["assignments"])))
     
-    # Parse dates and map them directly to their assignments
-    date_to_assignments = {}
+    # Parse dates and map them directly to their assignments AND leader
+    date_to_day_info = {}
     for d in data_sorted:
         dt = date(d["day"]["date"]["year"], d["day"]["date"]["month"], d["day"]["date"]["day"])
-        date_to_assignments[dt] = d["day"]["assignments"]
+        date_to_day_info[dt] = {
+            "assignments": d["day"]["assignments"],
+            "leader": d["day"].get("leader")  # Extract the leader field
+        }
         
-    dates_in_data = set(date_to_assignments.keys())
+    dates_in_data = set(date_to_day_info.keys())
     
     if not dates_in_data:
         return np.array([]), np.array([]), [], []
@@ -255,7 +282,9 @@ def process_data(data):
     # Populate the matrices
     for row_idx, row_def in enumerate(row_definitions):
         if row_def["type"] == "known":
-            assignments = date_to_assignments[row_def["date"]]
+            day_info = date_to_day_info[row_def["date"]]
+            assignments = day_info["assignments"]
+            leader = day_info["leader"]
             
             for assignment in assignments:
                 operator, operation = assignment[0], assignment[1]
@@ -263,16 +292,18 @@ def process_data(data):
                 text_mat[row_idx, col_idx] = operation
                 
                 # Categorize the operation for coloring
-                if operation.startswith("O"):
+                if operator == leader:
+                    int_mat[row_idx, col_idx] = 5  # Blue (Team Leader) overrides other states
+                elif operation.startswith("O"):
                     int_mat[row_idx, col_idx] = 0  # Green (Operations)
                 elif operation == "T":
-                    int_mat[row_idx, col_idx] = 1  # Purple (Training)
+                    int_mat[row_idx, col_idx] = 1  # Training
                 elif operation == "L":
-                    int_mat[row_idx, col_idx] = 2  # Red (Leave)
+                    int_mat[row_idx, col_idx] = 2  # Loaned out
                 elif operation in ["E", "S"]:
-                    int_mat[row_idx, col_idx] = 3  # Gray (Extra/Other)
+                    int_mat[row_idx, col_idx] = 3  # Absent
                 else:
-                    int_mat[row_idx, col_idx] = 3  # Fallback to gray
+                    int_mat[row_idx, col_idx] = 3  # Fallback
 
     row_labels = [r["label"] for r in row_definitions]
     return text_mat, int_mat, row_labels, operators
@@ -281,28 +312,29 @@ def plot_assignment_history(text_mat, int_mat, days, operators):
     # Dynamic sizing so it perfectly fits however many compressed rows we generate
     fig, ax = plt.subplots(figsize=(len(operators) * 0.75, len(days) * 0.3))
 
-    # Reusing the established color palette + White for "Unknown"
+    # Color palette
     colors = [
-        "#a1d99b", # 0: Soft Green (Operations)
-        "#fdbb84", # 1: Soft Purple (Training)fdbb84
-        "#9e9ac8", # 2: Tuned-down Red (Leave)e17674
-        "#e17674", # 3: Neutral Gray (Extra)
-        "#ffffff", # 4: White (Unknown/Missing)
+        "#a1d99b", # 0: Operation (Soft Green)
+        "#fdbb84", # 1: Training (Orange)
+        "#9e9ac8", # 2: Loaned Out (Purple)
+        "#e17674", # 3: Absent (Red)
+        "#ffffff", # 4: Unknown (White)
+        "#aec7e8", # 5: Team Leader (Pastel Blue)
     ]
     cmap = ListedColormap(colors)
 
     # Plot the matrix
     im = ax.imshow(int_mat, aspect='auto', cmap=cmap, interpolation='nearest')
-    im.set_clim(-0.5, 4.5)
+    im.set_clim(-0.5, 5.5) # Increased upper limit to 5.5 to include state 5
 
-    # Configure Axes (Removed fontweight='bold' for labels and ticks)
+    # Configure Axes
     ax.set_xticks(np.arange(len(operators)))
     ax.set_yticks(np.arange(len(days)))
-    ax.set_xticklabels(operators, fontsize=10)
-    ax.set_yticklabels(days, fontsize=10)
+    ax.set_xticklabels(operators, fontsize=11)
+    ax.set_yticklabels(days, fontsize=11)
 
-    ax.set_xlabel("Operators", labelpad=10)
-    ax.set_ylabel("Date Timeline", labelpad=10)
+    ax.set_xlabel("Operators", labelpad=10, fontsize=13)
+    ax.set_ylabel("Dates", labelpad=10, fontsize=13)
 
     # Remove outer black box (spines)
     for spine in ax.spines.values():
@@ -314,7 +346,7 @@ def plot_assignment_history(text_mat, int_mat, days, operators):
     ax.grid(which='minor', color='white', linestyle='-', linewidth=2)
     ax.tick_params(which="both", bottom=False, left=False)
 
-    # Overlay the text labels and hatching (Restored fontweight='bold')
+    # Overlay the text labels and hatching
     for i in range(len(days)):         # rows
         for j in range(len(operators)): # cols
             text = text_mat[i, j]
@@ -329,17 +361,20 @@ def plot_assignment_history(text_mat, int_mat, days, operators):
                 # Normal dark text for active assignments
                 ax.text(j, i, text, ha='center', va='center', color='#333333', fontsize=10, fontweight='bold')
 
-    # Create Custom Legend
-    legend_labels = ["Operation", "Training (T)", "Loaned out (L)", "Absent (E)"]
-    legend_patches = [mpatches.Patch(facecolor=colors[i], edgecolor='white', label=legend_labels[i]) for i in range(4)]
+    legend_elements = [
+        Patch(facecolor='#aec7e8', edgecolor='white', label='TL (Team Leader)'),
+        Patch(facecolor='#a1d99b', edgecolor='white', label='OX (Operation)'),
+        Patch(facecolor='#e17674', edgecolor='white', label='E (Absent)'),
+        Patch(facecolor='#fdbb84', edgecolor='white', label='T (Training)'),
+        Patch(facecolor='#9e9ac8', edgecolor='white', label='L (Loaned out)'),
+        Patch(facecolor='#ffffff', edgecolor='#a6a6a6', hatch='////', label='U (Unknown)')
+    ]
     
-    # Add the special hatched patch for Unknown
-    legend_patches.append(mpatches.Patch(facecolor='#ffffff', edgecolor='#a6a6a6', hatch='////', label='Unknown (U)'))
-    
-    ax.legend(handles=legend_patches, loc='lower center', bbox_to_anchor=(0.5, 1.02), ncol=5, frameon=False, fontsize=10)
+    # Legend placed safely underneath the title
+    ax.legend(handles=legend_elements, loc='lower center', bbox_to_anchor=(0.5, 1.02), ncol=7, frameon=False, fontsize=10)
 
-    # Add the title text below the figure (Bumped up the y-coordinate to 0.04 to bring it closer)
-    ax.set_title("VCE Station: Assignment History", fontsize=16, fontweight='bold', pad=45)
+    # Add the title text
+    ax.set_title("Volvo CE Station Daily Assignments in January, February, and March 2026", fontsize=16, pad=40)
     
     # Adjusted rect to tighten the gap between the axes and the text
     plt.tight_layout(rect=[0, 0.06, 1, 1])

@@ -408,9 +408,10 @@ mod tests {
     fn test_static() -> Result<(), Box<dyn std::error::Error>> {
         let manifest_dir =
             std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
-        let s = "S2";
+        // let s = "S2";
         // let e = "E0";
-        let path = format!("{}/data/synthetic/{}_matrix_static.json", manifest_dir, s);
+        // let path = format!("{}/data/synthetic/{}_matrix_static.json", manifest_dir, s);
+        let path = format!("{}/data/factory/VCE_matrix.json", manifest_dir);
 
         let json_content = fs::read_to_string(path)?;
         let matrix: Matrix = serde_json::from_str(&json_content)?;
@@ -419,7 +420,7 @@ mod tests {
         let omega = 1;
         let alpha = 3;
 
-        if let Some(station) = matrix.stations.get(s) {
+        if let Some(station) = matrix.stations.get("CE") {
             let s = calculate_static_assignment(station, offset, omega, alpha);
             pretty_print_internal_assignments(station, &s.internal_assignments);
             pretty_print_competence_matrix(station);

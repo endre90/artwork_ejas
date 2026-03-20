@@ -4,6 +4,7 @@
     "day": {
       "date": { "year": 2026, "month": 1, "day": 16 },
       "station": "1",
+      "leader": "K",
       "assignments": [
         ["A", "E"],
         ["B", "O7"],
@@ -28,6 +29,7 @@
     "day": {
       "date": { "year": 2026, "month": 1, "day": 17 },
       "station": "1",
+      "leader": "K",
       "assignments": [
         ["A", "O10"],
         ["B", "O9"],
@@ -52,6 +54,7 @@
     "day": {
       "date": { "year": 2026, "month": 1, "day": 18 },
       "station": "1",
+      "leader": "K",
       "assignments": [
         ["A", "O10"],
         ["B", "O9"],
@@ -76,6 +79,7 @@
     "day": {
       "date": { "year": 2026, "month": 1, "day": 19 },
       "station": "1",
+      "leader": "F",
       "assignments": [
         ["A", "O1"],
         ["B", "T"],
@@ -100,6 +104,7 @@
     "day": {
       "date": { "year": 2026, "month": 1, "day": 20 },
       "station": "1",
+      "leader": "L",
       "assignments": [
         ["A", "O7"],
         ["B", "O9"],
@@ -124,6 +129,7 @@
     "day": {
       "date": { "year": 2026, "month": 1, "day": 23 },
       "station": "1",
+      "leader": "L",
       "assignments": [
         ["A", "O2"],
         ["B", "O9"],
@@ -148,6 +154,7 @@
     "day": {
       "date": { "year": 2026, "month": 2, "day": 2 },
       "station": "1",
+      "leader": "K",
       "assignments": [
         ["A", "O7"],
         ["B", "O2"],
@@ -172,6 +179,7 @@
     "day": {
       "date": { "year": 2026, "month": 2, "day": 3 },
       "station": "1",
+      "leader": "K",
       "assignments": [
         ["A", "E"],
         ["B", "O1"],
@@ -196,6 +204,7 @@
     "day": {
       "date": { "year": 2026, "month": 2, "day": 4 },
       "station": "1",
+      "leader": "K",
       "assignments": [
         ["A", "E"],
         ["B", "O9"],
@@ -220,6 +229,7 @@
     "day": {
       "date": { "year": 2026, "month": 2, "day": 5 },
       "station": "1",
+      "leader": "K",
       "assignments": [
         ["A", "E"],
         ["B", "O5"],
@@ -244,6 +254,7 @@
     "day": {
       "date": { "year": 2026, "month": 2, "day": 6 },
       "station": "1",
+      "leader": "K",
       "assignments": [
         ["A", "E"],
         ["B", "T"],
@@ -268,6 +279,7 @@
     "day": {
       "date": { "year": 2026, "month": 2, "day": 11 },
       "station": "1",
+      "leader": "K",
       "assignments": [
         ["A", "O1"],
         ["B", "O4"],
@@ -292,6 +304,7 @@
     "day": {
       "date": { "year": 2026, "month": 2, "day": 16 },
       "station": "1",
+      "leader": "L",
       "assignments": [
         ["A", "O3"],
         ["B", "O9"],
@@ -316,6 +329,7 @@
     "day": {
       "date": { "year": 2026, "month": 2, "day": 17 },
       "station": "1",
+      "leader": "L",
       "assignments": [
         ["A", "O11"],
         ["B", "O7"],
@@ -340,6 +354,7 @@
     "day": {
       "date": { "year": 2026, "month": 2, "day": 27 },
       "station": "1",
+      "leader": "L",
       "assignments": [
         ["A", "O7"],
         ["B", "O9"],
@@ -364,6 +379,7 @@
     "day": {
       "date": { "year": 2026, "month": 3, "day": 2 },
       "station": "1",
+      "leader": "L",
       "assignments": [
         ["A", "O1"],
         ["B", "O9"],
@@ -388,6 +404,7 @@
     "day": {
       "date": { "year": 2026, "month": 3, "day": 3 },
       "station": "1",
+      "leader": "L",
       "assignments": [
         ["A", "O6"],
         ["B", "O8"],
@@ -412,6 +429,7 @@
     "day": {
       "date": { "year": 2026, "month": 3, "day": 4 },
       "station": "1",
+      "leader": "L",
       "assignments": [
         ["A", "O2"],
         ["B", "O9"],
@@ -436,6 +454,7 @@
     "day": {
       "date": { "year": 2026, "month": 3, "day": 5 },
       "station": "1",
+      "leader": "L",
       "assignments": [
         ["A", "O2"],
         ["B", "O9"],
@@ -460,6 +479,7 @@
     "day": {
       "date": { "year": 2026, "month": 3, "day": 6 },
       "station": "1",
+      "leader": "L",
       "assignments": [
         ["A", "O7"],
         ["B", "O9"],
@@ -484,6 +504,7 @@
     "day": {
       "date": { "year": 2026, "month": 3, "day": 9 },
       "station": "1",
+      "leader": "L",
       "assignments": [
         ["A", "O3"],
         ["B", "O10"],
@@ -508,6 +529,7 @@
     "day": {
       "date": { "year": 2026, "month": 3, "day": 10 },
       "station": "1",
+      "leader": "L",
       "assignments": [
         ["A", "O3"],
         ["B", "O12"],
