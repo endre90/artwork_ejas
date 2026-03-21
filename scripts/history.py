@@ -334,7 +334,7 @@ def plot_assignment_history(text_mat, int_mat, days, operators):
     ax.set_yticklabels(days, fontsize=11)
 
     ax.set_xlabel("Operators", labelpad=10, fontsize=13)
-    ax.set_ylabel("Dates", labelpad=10, fontsize=13)
+    # ax.set_ylabel("Dates", labelpad=10, fontsize=13)
 
     # Remove outer black box (spines)
     for spine in ax.spines.values():

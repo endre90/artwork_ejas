@@ -237,7 +237,7 @@ def plot_schedule_grid(int_mat, label_mat, date_labels, operators):
     ax.set_yticklabels(date_labels, fontsize=11)
 
     ax.set_xlabel("Operators", labelpad=15, fontsize=13)
-    ax.set_ylabel("Dates", labelpad=15, fontsize=13)
+    # ax.set_ylabel("Dates", labelpad=15, fontsize=13)
 
     # Remove default spines and ticks
     for spine in ax.spines.values():
@@ -284,14 +284,14 @@ def plot_schedule_grid(int_mat, label_mat, date_labels, operators):
     ax.legend(handles=legend_elements, loc='lower center', bbox_to_anchor=(0.5, 1.02), ncol=7, frameon=False, fontsize=10)
 
     # Adjusted padding slightly since the legend is now only one row tall
-    ax.set_title("Volvo GTO Station Daily Assignments in January 2026 (4 Passes / Day)", fontsize=16, pad=40)
+    ax.set_title("Volvo GTO Station Daily Assignments in November 2026 (4 Passes / Day)", fontsize=20, pad=40)
     
     plt.tight_layout()
-    plt.savefig("gto_history_jan.pdf", bbox_inches="tight")
+    plt.savefig("gto_history_nov.pdf", bbox_inches="tight")
     plt.show()
 
 def main():
-    with open("/home/endre/rust_ws/artwork_ejas/data/factory/GTO_jan_history.json", "r") as f:
+    with open("/home/endre/rust_ws/artwork_ejas/data/factory/GTO_nov_history.json", "r") as f:
         data = json.load(f)
 
     int_mat, label_mat, date_labels, operators = process_schedule_data(data)
