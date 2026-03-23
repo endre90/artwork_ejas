@@ -284,7 +284,7 @@ def plot_schedule_grid(int_mat, label_mat, date_labels, operators):
     ax.legend(handles=legend_elements, loc='lower center', bbox_to_anchor=(0.5, 1.02), ncol=7, frameon=False, fontsize=10)
 
     # Adjusted padding slightly since the legend is now only one row tall
-    ax.set_title("Volvo GTO Station Daily Assignments in November 2026 (4 Passes / Day)", fontsize=20, pad=40)
+    ax.set_title("Volvo GTO Station Daily Assignments in November 2025 (4 Passes / Day)", fontsize=20, pad=40)
     
     plt.tight_layout()
     plt.savefig("gto_history_nov.pdf", bbox_inches="tight")

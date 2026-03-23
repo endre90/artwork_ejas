@@ -78,7 +78,7 @@
           },
           {
             "name": "K",
-            "role": "Operator", 
+            "role": "TeamLeader", 
             "competences": ["O1", "O2", "O3", "O4", "O5", "O6", "O7", "O10", "O11", "O12"],
             "preferences": ["O12", "O6"]
           },

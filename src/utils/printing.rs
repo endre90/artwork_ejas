@@ -1,6 +1,8 @@
 use crate::*;
+use serde_json::json;
+
 // Print all (employee -> job) assignments
-pub fn pretty_print_internal_assignments(station: &Station, assignment: &[(String, String)]) {
+pub fn pretty_print_internal_assignments(station: &Station, assignment: &[(String, String)], loaned: &Vec<String>, absent: &Vec<String>, training: &Vec<String>) {
     // Sort job names (for consistency if you want to show them in some order here)
     let mut sorted_jobs: Vec<String> = station.ergo_score.keys().cloned().collect();
     sorted_jobs.sort();
@@ -15,12 +17,58 @@ pub fn pretty_print_internal_assignments(station: &Station, assignment: &[(Strin
     } else {
         // Sort assignment for deterministic order
         let mut sorted_assignment = assignment.to_vec();
+        loaned.iter().for_each(|x| sorted_assignment.insert(0, (x.to_string(), "L".to_string())));
+        absent.iter().for_each(|x| sorted_assignment.insert(0, (x.to_string(), "E".to_string())));
+        training.iter().for_each(|x| sorted_assignment.insert(0, (x.to_string(), "T".to_string())));
         sorted_assignment.sort_by(|(e1, _), (e2, _)| e1.cmp(e2));
         for (employee, job) in &sorted_assignment {
             println!("    {} -> {}", employee, job);
         }
     }
     println!();
+}
+
+pub fn print_assignments_as_serde_json(
+    year: i32,
+    month: u32,
+    day: u32,
+    station_id: &str,
+    leader: &str,
+    assignment: &[(String, String)],
+    loaned: &Vec<String>,
+    absent: &Vec<String>,
+    training: &Vec<String>,
+    s: ErgonomicAssignmentSolution
+) {
+    let mut sorted_assignment = assignment.to_vec();
+    
+    loaned.iter().for_each(|x| sorted_assignment.push((x.to_string(), "L".to_string())));
+    absent.iter().for_each(|x| sorted_assignment.push((x.to_string(), "E".to_string())));
+    training.iter().for_each(|x| sorted_assignment.push((x.to_string(), "T".to_string())));
+    
+    sorted_assignment.sort_by(|(e1, _), (e2, _)| e1.cmp(e2));
+
+    let output = json!({
+        "day": {
+            "date": {
+                "year": year,
+                "month": month,
+                "day": day
+            },
+            "offset": s.offset,
+            "pref": s.weighted_preference_reward_score,
+            "lead": s.weighted_leader_penalty_score,
+            "exte": s.weighted_external_penalty_score,
+            "hist_ergo": s.weighted_historical_penalty_score,
+            "total": s.objective_score,
+            "solver_time": format!("{:?}", s.solving_time),
+            "station": station_id,
+            "leader": leader,
+            "assignments": sorted_assignment
+        }
+    });
+
+    println!("{}", serde_json::to_string_pretty(&output).unwrap());
 }
 
 pub fn pretty_print_external_assignments(station: &Station, assignment: &[String]) {

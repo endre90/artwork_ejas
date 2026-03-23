@@ -8,7 +8,7 @@ use z3::{
 
 use crate::*;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ErgonomicAssignmentSolution {
     pub internal_assignments: Vec<(String, String)>, // (employee, job) pairs
     pub external_assignments: Vec<String>,           // jobs
@@ -29,6 +29,7 @@ pub struct ErgonomicAssignmentSolution {
     pub p_matrix: Vec<Vec<usize>>, // preference matrix passed back
     pub h_matrix: Vec<Vec<u32>>,   // historic matrix passed back
     pub solving_time: Duration,    // how long the solver took
+    pub offset: u32
 }
 
 pub fn calculate_ergonomic_assignment(
@@ -40,8 +41,8 @@ pub fn calculate_ergonomic_assignment(
     beta: u32,   // How strongly to discourage external operator usage
     tau: u32,    // Number of days to consider in the historical data (from tau to today)
     gamma: u32, // how strongly to penalize assigning the same employee–job pair that was frequently assigned in the past tau days
-    delta: u32, // Ergonomics weight
-    theta: u32, // Weight controlling how the historical count reduces the ergonomics benefit of a job for a given employee.
+    // delta: u32, // Ergonomics weight
+    // theta: u32, // Weight controlling how the historical count reduces the ergonomics benefit of a job for a given employee.
     forced_assignments: &[(String, String)],
     loaned_employees: &[String],
     absent_employees: &[String],
@@ -705,6 +706,7 @@ pub fn calculate_ergonomic_assignment(
                 p_matrix,
                 h_matrix,
                 solving_time,
+                offset
             }
         }
         SatResult::Unsat => {
@@ -729,6 +731,7 @@ pub fn calculate_ergonomic_assignment(
                 p_matrix,
                 h_matrix,
                 solving_time,
+                offset
             }
         }
         _ => {
@@ -753,6 +756,7 @@ pub fn calculate_ergonomic_assignment(
                 p_matrix,
                 h_matrix,
                 solving_time,
+                offset
             }
         }
     }
@@ -772,7 +776,7 @@ mod tests {
         // let path = format!("{}/data/synthetic/{}_matrix_static.json", manifest_dir, s);
         let path = format!("{}/data/factory/VCE_matrix.json", manifest_dir);
 
-        let history_path = format!("{}/data/factory/VCE_history.json", manifest_dir);
+        let history_path = format!("{}/data/factory/VCE_history_part_a.json", manifest_dir);
         let history_content = fs::read_to_string(history_path)?;
         let history_wrapper: Vec<DayWrapper> = serde_json::from_str(&history_content)?;
         let history: Vec<Day> = history_wrapper.into_iter().map(|dw| dw.day).collect();
@@ -780,22 +784,23 @@ mod tests {
         let json_content = fs::read_to_string(path)?;
         let matrix: Matrix = serde_json::from_str(&json_content)?;
 
-        let offset = 10;
+        let offset = 0;
         let omega = 1;
-        let alpha = 1;
-        let beta = 1;
-        let tau = 10;
-        let gamma = 1;
-        let theta = 1;
-        let delta = 1;
+        let alpha = 192;
+        let beta = 384;
+        let tau = 5;
+        let gamma = 24;
+        // let theta = 1;
+        // let delta = 1;
 
-        let forced_assignments = [
-            // ("O".to_string(), "O3".to_string()),
-            // ("P".to_string(), "O6".to_string()),
-        ];
+        let loaned = vec!();
+        let absent = vec!("L","O").iter().map(|x| x.to_string()).collect::<Vec<String>>();
+        let training = vec!("P").iter().map(|x| x.to_string()).collect::<Vec<String>>();
+
+        let forced_assignments = [];
 
         if let Some(station) = matrix.stations.get("CE") {
-            let s = calculate_ergonomic_assignment(
+            let s: ErgonomicAssignmentSolution = calculate_ergonomic_assignment(
                 station,
                 history.clone(),
                 offset,
@@ -804,18 +809,13 @@ mod tests {
                 beta,
                 tau,
                 gamma,
-                delta,
-                theta,
                 &forced_assignments,
-                &[],
-                &[],
-                &[],
-
-                // &["O".to_string()],
-                // &["A".to_string()], // A is absent for example...
-                // &["P".to_string()]
+                &loaned,
+                &absent,
+                &training,
             );
-            pretty_print_internal_assignments(station, &s.internal_assignments);
+            print_assignments_as_serde_json(2026, 1, 20, "CE", "K", &s.internal_assignments, &loaned, &absent, &training, s.clone());
+            pretty_print_internal_assignments(station, &s.internal_assignments, &loaned, &absent, &training);
             pretty_print_external_assignments(station, &s.external_assignments);
             pretty_print_competence_matrix(station);
             pretty_print_preference_matrix(station);
