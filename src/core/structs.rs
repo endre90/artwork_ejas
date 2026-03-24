@@ -37,6 +37,7 @@ pub struct Day {
     pub date: Date,
     pub station: String,
     pub assignments: Vec<(String, String)>, // (employee, job)
+    pub leader: String
 }
 
 #[derive(Debug, Clone, Deserialize)]

@@ -157,8 +157,8 @@ mod tests {
 
         // Load the manual history data
         // Make sure this points to the file containing your manual assignment JSON
-        // let history_path = format!("{}/data/factory/VCE_history.json", manifest_dir);
-        let history_path = format!("{}/data/factory/VCE_algo_strat_1_rolling_part_a.json", manifest_dir);
+        let history_path = format!("{}/data/factory/VCE_history.json", manifest_dir);
+        // let history_path = format!("{}/data/factory/VCE_algo_strat_1_rolling_part_a.json", manifest_dir);
         let history_content = fs::read_to_string(history_path)?;
         let history_wrapper: Vec<DayWrapper> = serde_json::from_str(&history_content)?;
         let history: Vec<Day> = history_wrapper.into_iter().map(|dw| dw.day).collect();
@@ -178,7 +178,7 @@ mod tests {
             // Explicitly define the date you want to evaluate
             let target_year = 2026;
             let target_month = 1;
-            let target_date = 22;
+            let target_date = 23;
 
             // Find the index of that specific day in the history array
             let target_index = history
