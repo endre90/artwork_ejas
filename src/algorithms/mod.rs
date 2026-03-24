@@ -1,4 +1,5 @@
 pub mod ergonomic;
+pub mod evaluate_manual;
 // pub mod r#static;
 // pub mod external;
 // pub mod historic;

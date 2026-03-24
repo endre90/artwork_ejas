@@ -776,7 +776,8 @@ mod tests {
         // let path = format!("{}/data/synthetic/{}_matrix_static.json", manifest_dir, s);
         let path = format!("{}/data/factory/VCE_matrix.json", manifest_dir);
 
-        let history_path = format!("{}/data/factory/VCE_history_part_a.json", manifest_dir);
+        let history_path = format!("{}/data/factory/VCE_algo_strat_1_rolling_part_a.json", manifest_dir);
+        // let history_path = format!("{}/data/factory/VCE_history_part_a.json", manifest_dir);
         let history_content = fs::read_to_string(history_path)?;
         let history_wrapper: Vec<DayWrapper> = serde_json::from_str(&history_content)?;
         let history: Vec<Day> = history_wrapper.into_iter().map(|dw| dw.day).collect();
@@ -784,18 +785,19 @@ mod tests {
         let json_content = fs::read_to_string(path)?;
         let matrix: Matrix = serde_json::from_str(&json_content)?;
 
-        let offset = 0;
+        let offset = 2000;
         let omega = 1;
         let alpha = 192;
+        // let alpha = 0;
         let beta = 384;
         let tau = 5;
         let gamma = 24;
         // let theta = 1;
         // let delta = 1;
 
-        let loaned = vec!();
-        let absent = vec!("L","O").iter().map(|x| x.to_string()).collect::<Vec<String>>();
-        let training = vec!("P").iter().map(|x| x.to_string()).collect::<Vec<String>>();
+        let loaned = vec!("O").iter().map(|x| x.to_string()).collect::<Vec<String>>();
+        let absent = vec!("C","J").iter().map(|x| x.to_string()).collect::<Vec<String>>();
+        let training = vec!("N").iter().map(|x| x.to_string()).collect::<Vec<String>>();
 
         let forced_assignments = [];
 
@@ -814,7 +816,7 @@ mod tests {
                 &absent,
                 &training,
             );
-            print_assignments_as_serde_json(2026, 1, 20, "CE", "K", &s.internal_assignments, &loaned, &absent, &training, s.clone());
+            print_assignments_as_serde_json(2026, 1, 23, "CE", "L", &s.internal_assignments, &loaned, &absent, &training, s.clone());
             pretty_print_internal_assignments(station, &s.internal_assignments, &loaned, &absent, &training);
             pretty_print_external_assignments(station, &s.external_assignments);
             pretty_print_competence_matrix(station);
