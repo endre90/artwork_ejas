@@ -1,0 +1,98 @@
+    [
+        {
+            "day": {
+                "date": {
+                    "year": 2026,
+                    "month": 2,
+                    "day": 27
+                },
+                "manual": 1841,
+                "initial": 1841,
+                "rolling": 1841
+            }
+        },
+        {
+            "day": {
+                "date": {
+                    "year": 2026,
+                    "month": 3,
+                    "day": 2
+                },
+                "manual": 1721,
+                "initial": 1907,
+                "rolling": 1907
+            }
+        },
+        {
+            "day": {
+                "date": {
+                    "year": 2026,
+                    "month": 3,
+                    "day": 3
+                },
+                "manual": 1043,
+                "initial": 1521,
+                "rolling": 1488
+            }
+        },
+        {
+            "day": {
+                "date": {
+                    "year": 2026,
+                    "month": 3,
+                    "day": 4
+                },
+                "manual": 1227,
+                "initial": 1500,
+                "rolling": 1476
+            }
+        },
+        {
+            "day": {
+                "date": {
+                    "year": 2026,
+                    "month": 3,
+                    "day": 5
+                },
+                "manual": 627,
+                "initial": 1500,
+                "rolling": 1465
+            }
+        },
+        {
+            "day": {
+                "date": {
+                    "year": 2026,
+                    "month": 3,
+                    "day": 6
+                },
+                "manual": 809,
+                "initial": 1824,
+                "rolling": 1801
+            }
+        },
+        {
+            "day": {
+                "date": {
+                    "year": 2026,
+                    "month": 3,
+                    "day": 9
+                },
+                "manual": 1334,
+                "initial": 1500,
+                "rolling": 1456
+            }
+        },
+        {
+            "day": {
+                "date": {
+                    "year": 2026,
+                    "month": 3,
+                    "day": 10
+                },
+                "manual": 1430,
+                "initial": 1822,
+                "rolling": 1825
+            }
+        }
+    ]

@@ -72,3 +72,8 @@ pub struct StaticAssignmentData {
     pub competence_map: Vec<CompetenceEntry>,
     pub preference_map: Vec<PreferenceEntry>,
 }
+
+#[derive(Debug, Deserialize)]
+    pub struct PassWrapper {
+        pub pass: Pass,
+    }

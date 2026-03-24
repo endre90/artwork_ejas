@@ -47,6 +47,7 @@ pub fn calculate_ergonomic_assignment(
     loaned_employees: &[String],
     absent_employees: &[String],
     special_training_employees: &[String],
+    supervision: &[String]
 ) -> ErgonomicAssignmentSolution {
     let mut jobs = vec![];
     let mut employees = vec![];
@@ -568,6 +569,18 @@ pub fn calculate_ergonomic_assignment(
         }
     }
 
+    // Force supervision employees (they get NO jobs today)
+    for emp_name in supervision {
+        if let Some(i) = employees.iter().position(|e| e == emp_name) {
+            // Assert that EVERY job for this employee MUST be false
+            for j in 0..jobs.len() {
+                optimizer.assert(&x[i][j]._eq(&Bool::from_bool(&ctx, false)));
+            }
+        } else {
+            log::warn!("Unknown employee: {}", emp_name);
+        }
+    }
+
     // Add offset to the objective
     let offset_z3 = Int::from_i64(&ctx, offset as i64);
 
@@ -799,6 +812,7 @@ mod tests {
         let loaned = vec!("O").iter().map(|x| x.to_string()).collect::<Vec<String>>();
         let absent = vec!("C","J").iter().map(|x| x.to_string()).collect::<Vec<String>>();
         let training = vec!("N").iter().map(|x| x.to_string()).collect::<Vec<String>>();
+        let supervision = vec!();
 
         let forced_assignments = [];
 
@@ -816,6 +830,7 @@ mod tests {
                 &loaned,
                 &absent,
                 &training,
+                &supervision
             );
             print_assignments_as_serde_json(2026, 1, 23, "CE", "L", &s.internal_assignments, &loaned, &absent, &training, s.clone());
             pretty_print_internal_assignments(station, &s.internal_assignments, &loaned, &absent, &training);
@@ -870,7 +885,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ergonomic_rolling_evaluation_to_file() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_ergonomic_initial_evaluation_to_file() -> Result<(), Box<dyn std::error::Error>> {
         let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
         
         let path = format!("{}/data/factory/VCE_matrix.json", manifest_dir);
@@ -878,7 +893,7 @@ mod tests {
         let matrix: Matrix = serde_json::from_str(&json_content)?;
 
         // Assuming your provided JSON snippet is stored in a file like this:
-        let history_path = format!("{}/data/factory/VCE_history_part_a_temp.json", manifest_dir);
+        let history_path = format!("{}/data/factory/VCE_history_part_d.json", manifest_dir);
         let history_content = fs::read_to_string(history_path)?;
         let history_wrapper: Vec<DayWrapper> = serde_json::from_str(&history_content)?;
         let full_history: Vec<Day> = history_wrapper.into_iter().map(|dw| dw.day).collect();
@@ -911,6 +926,7 @@ mod tests {
             let mut absent = Vec::new();
             let mut training = Vec::new();
             let mut loaned = Vec::new();
+            let supervision = Vec::new();
 
             for assignment in &current_day.assignments {
                 let person = &assignment.0;
@@ -937,6 +953,7 @@ mod tests {
                 &loaned,
                 &absent,
                 &training,
+                &supervision
             );
 
             // Replicating your print_assignments_as_serde_json logic here to store in a file
@@ -973,7 +990,7 @@ mod tests {
         }
 
         // Write the complete array of days to a JSON file
-        let output_file_path = format!("{}/data/factory/vce_part_a_initial_assignments.json", manifest_dir);
+        let output_file_path = format!("{}/data/factory/VCE_initial_part_d.json", manifest_dir);
         let mut file = File::create(&output_file_path)?;
         
         // Convert the vector of JSON objects into a pretty formatted JSON array string
@@ -993,7 +1010,7 @@ mod tests {
         let json_content = fs::read_to_string(path)?;
         let matrix: Matrix = serde_json::from_str(&json_content)?;
 
-        let history_path = format!("{}/data/factory/VCE_history_part_a.json", manifest_dir);
+        let history_path = format!("{}/data/factory/VCE_history_part_d.json", manifest_dir);
         let history_content = fs::read_to_string(history_path)?;
         let history_wrapper: Vec<DayWrapper> = serde_json::from_str(&history_content)?;
         
@@ -1019,6 +1036,7 @@ mod tests {
             let mut absent = Vec::new();
             let mut training = Vec::new();
             let mut loaned = Vec::new();
+            let supervision = Vec::new();
 
             // UPDATED: Destructure the tuple directly instead of using array indexing
             for (person, task) in &full_history[i].assignments {
@@ -1048,6 +1066,8 @@ mod tests {
                 &loaned,
                 &absent,
                 &training,
+                &supervision
+                
             );
 
             // 4. Build the final Vec<(String, String)> for this day
@@ -1088,7 +1108,7 @@ mod tests {
             all_days_output.push(day_output);
         }
 
-        let output_file_path = format!("{}/data/factory/closed_loop_algo_output.json", manifest_dir);
+        let output_file_path = format!("{}/data/factory/VCE_rolling_part_d.json", manifest_dir);
         let mut file = File::create(&output_file_path)?;
         
         let pretty_json_array = serde_json::to_string_pretty(&all_days_output)?;
@@ -1098,4 +1118,292 @@ mod tests {
 
         Ok(())
     }
+
+
+   #[test]
+    fn test_ergonomic_with_passses_evaluation_to_file() -> Result<(), Box<dyn std::error::Error>> {
+        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
+        
+        let path = format!("{}/data/factory/GTO_matrix.json", manifest_dir);
+        let json_content = fs::read_to_string(path)?;
+        let matrix: Matrix = serde_json::from_str(&json_content)?;
+
+        let history_path = format!("{}/data/factory/GTO_nov_history.json", manifest_dir);
+        let history_content = fs::read_to_string(history_path)?;
+        let history_wrapper: Vec<PassWrapper> = serde_json::from_str(&history_content)?;
+        let full_passes: Vec<Pass> = history_wrapper.into_iter().map(|pw| pw.pass).collect();
+
+        let offset = 2000;
+        let omega = 1;
+        let alpha = 192;
+        let beta = 384;
+        let tau = 8; // 20 passes = 5 days
+        let gamma = 24;
+
+        let station_id = "GTO"; 
+        let station_data = matrix.stations.get(station_id).expect("Station not found in matrix");
+        let forced_assignments = [];
+
+        // 1. Identify the Team Leader dynamically from the matrix role
+        let leader_name = station_data
+            .people
+            .iter()
+            .find(|p| matches!(p.role, Role::TeamLeader))
+            .map(|p| p.name.clone())
+            .unwrap_or_default();
+
+        let mut all_passes_output = Vec::new();
+
+        // Start evaluating from index 1 forward
+        for i in 1..full_passes.len() {
+            let current_pass = &full_passes[i];
+            
+            // 2. Extract manual constraints (E, T, L)
+            let mut absent = Vec::new();
+            let mut training = Vec::new();
+            let mut loaned = Vec::new();
+            let mut supervision = Vec::new();
+
+            for (person, task) in &current_pass.assignments {
+                match task.as_str() {
+                    "E" => absent.push(person.clone()),
+                    "T" => training.push(person.clone()),
+                    "S" => supervision.push(person.clone()),
+                    "L" => loaned.push(person.clone()),
+                    _ => {} 
+                }
+            }
+
+            let start_idx = if i > tau { i - tau } else { 0 };
+            let history_window_passes = full_passes[start_idx..i].to_vec();
+
+            // 3. Map Pass to Day so the algorithm can digest it
+            let history_window_days: Vec<Day> = history_window_passes.iter().map(|p| {
+                Day {
+                    date: p.date.clone(), // You can clone directly since they share the Date struct!
+                    station: p.station.clone(),
+                    leader: leader_name.clone(), 
+                    assignments: p.assignments.clone(), 
+                }
+            }).collect();
+
+            // 4. Run the algorithm
+            let s: ErgonomicAssignmentSolution = calculate_ergonomic_assignment(
+                station_data,
+                history_window_days,
+                offset,
+                omega,
+                alpha,
+                beta,
+                tau as u32,
+                gamma,
+                &forced_assignments,
+                &loaned,
+                &absent,
+                &training,
+                &supervision
+            );
+
+            // 5. Reconstruct the full assignment for the pass
+            let mut sorted_assignment = s.internal_assignments.to_vec();
+            loaned.iter().for_each(|x| sorted_assignment.push((x.to_string(), "L".to_string())));
+            absent.iter().for_each(|x| sorted_assignment.push((x.to_string(), "E".to_string())));
+            training.iter().for_each(|x| sorted_assignment.push((x.to_string(), "T".to_string())));
+            
+            // 6. Automatically assign the "TL" task if the leader is present and unassigned
+            if !leader_name.is_empty() {
+                let is_absent = absent.contains(&leader_name);
+                let is_training = training.contains(&leader_name);
+                let is_loaned = loaned.contains(&leader_name);
+                let is_on_operation = s.internal_assignments.iter().any(|(emp, _)| emp == &leader_name);
+
+                if !is_absent && !is_training && !is_loaned && !is_on_operation {
+                    sorted_assignment.push((leader_name.clone(), "TL".to_string()));
+                }
+            }
+
+            sorted_assignment.sort_by(|(e1, _), (e2, _)| e1.cmp(e2));
+
+            // 7. Output JSON formatted specifically for passes
+            let day_output = json!({
+                "pass": {
+                    "date": {
+                        "year": current_pass.date.year,
+                        "month": current_pass.date.month,
+                        "day": current_pass.date.day
+                    },
+                    "station": station_id,
+                    "pass": current_pass.pass, // Uses the u8 pass integer
+                    "offset": offset,
+                    "pref": s.weighted_preference_reward_score,
+                    "lead": s.weighted_leader_penalty_score,
+                    "exte": s.weighted_external_penalty_score,
+                    "hist_ergo": s.weighted_historical_penalty_score,
+                    "total": s.objective_score,
+                    "solver_time": format!("{:?}", s.solving_time),
+                    "assignments": sorted_assignment
+                }
+            });
+
+            all_passes_output.push(day_output);
+        }
+
+        let output_file_path = format!("{}/data/factory/GTO_november_initial_tau_8.json", manifest_dir);
+        let mut file = File::create(&output_file_path)?;
+        
+        let pretty_json_array = serde_json::to_string_pretty(&all_passes_output)?;
+        file.write_all(pretty_json_array.as_bytes())?;
+
+        println!("Successfully wrote pass-based evaluations to: {}", output_file_path);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_ergonomic_pass_rolling_evaluation_to_file() -> Result<(), Box<dyn std::error::Error>> {
+        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
+        
+        // 1. Load the Matrix
+        let path = format!("{}/data/factory/GTO_matrix.json", manifest_dir); // Ensure this points to your new matrix!
+        let json_content = fs::read_to_string(path)?;
+        let matrix: Matrix = serde_json::from_str(&json_content)?;
+
+        // 2. Load the Pass History
+        let history_path = format!("{}/data/factory/GTO_nov_history.json", manifest_dir); // Adjust path as needed
+        let history_content = fs::read_to_string(history_path)?;
+        let history_wrapper: Vec<PassWrapper> = serde_json::from_str(&history_content)?;
+        
+        // MAKE THIS MUTABLE so we can overwrite assignments as we go
+        let mut full_passes: Vec<Pass> = history_wrapper.into_iter().map(|pw| pw.pass).collect();
+
+        // 3. Algorithm Parameters
+        let offset = 2000;
+        let omega = 1;
+        let alpha = 192;
+        let beta = 384;
+        let tau = 8; // 20 passes = 5 days
+        let gamma = 24;
+
+        let station_id = "GTO"; 
+        let station_data = matrix.stations.get(station_id).expect("Station GTO not found in matrix");
+        let forced_assignments = [];
+
+        // Identify the Team Leader dynamically from the matrix role
+        let leader_name = station_data
+            .people
+            .iter()
+            .find(|p| matches!(p.role, Role::TeamLeader))
+            .map(|p| p.name.clone())
+            .unwrap_or_default();
+
+        let mut all_passes_output = Vec::new();
+
+        // Start evaluating from index 1 forward
+        for i in 1..full_passes.len() {
+            // 4. Extract manual constraints (E, T, L) BEFORE we overwrite the pass
+            let mut absent = Vec::new();
+            let mut training = Vec::new();
+            let mut loaned = Vec::new();
+            let mut supervision = Vec::new();
+
+            for (person, task) in &full_passes[i].assignments {
+                match task.as_str() {
+                    "E" => absent.push(person.clone()),
+                    "T" => training.push(person.clone()),
+                    "L" => loaned.push(person.clone()),
+                    "S" => supervision.push(person.clone()),
+                    _ => {} 
+                }
+            }
+
+            // 5. Slice the history window from the MUTATED full_passes
+            let start_idx = if i > tau { i - tau } else { 0 };
+            let history_window_passes = full_passes[start_idx..i].to_vec();
+
+            // Map Pass to Day so the algorithm can digest it
+            let history_window_days: Vec<Day> = history_window_passes.iter().map(|p| {
+                Day {
+                    date: p.date.clone(), 
+                    station: p.station.clone(),
+                    leader: leader_name.clone(), 
+                    assignments: p.assignments.clone(), 
+                }
+            }).collect();
+
+            // 6. Run the algorithm
+            let s: ErgonomicAssignmentSolution = calculate_ergonomic_assignment(
+                station_data,
+                history_window_days,
+                offset,
+                omega,
+                alpha,
+                beta,
+                tau as u32,
+                gamma,
+                &forced_assignments,
+                &loaned,
+                &absent,
+                &training,
+                &supervision
+            );
+
+            // 7. Reconstruct the full assignment for the pass
+            let mut sorted_assignment = s.internal_assignments.to_vec();
+            loaned.iter().for_each(|x| sorted_assignment.push((x.to_string(), "L".to_string())));
+            absent.iter().for_each(|x| sorted_assignment.push((x.to_string(), "E".to_string())));
+            training.iter().for_each(|x| sorted_assignment.push((x.to_string(), "T".to_string())));
+            
+            // Automatically assign the "TL" task if the leader is present and unassigned
+            if !leader_name.is_empty() {
+                let is_absent = absent.contains(&leader_name);
+                let is_training = training.contains(&leader_name);
+                let is_loaned = loaned.contains(&leader_name);
+                let is_on_operation = s.internal_assignments.iter().any(|(emp, _)| emp == &leader_name);
+
+                if !is_absent && !is_training && !is_loaned && !is_on_operation {
+                    sorted_assignment.push((leader_name.clone(), "TL".to_string()));
+                }
+            }
+
+            sorted_assignment.sort_by(|(e1, _), (e2, _)| e1.cmp(e2));
+
+            // 8. OVERWRITE the current pass's assignments with the newly generated ones
+            full_passes[i].assignments = sorted_assignment.clone();
+
+            // 9. Output JSON formatted specifically for passes
+            let current_pass = &full_passes[i];
+            let day_output = json!({
+                "pass": {
+                    "date": {
+                        "year": current_pass.date.year,
+                        "month": current_pass.date.month,
+                        "day": current_pass.date.day
+                    },
+                    "station": station_id,
+                    "pass": current_pass.pass, 
+                    "offset": offset,
+                    "pref": s.weighted_preference_reward_score,
+                    "lead": s.weighted_leader_penalty_score,
+                    "exte": s.weighted_external_penalty_score,
+                    "hist_ergo": s.weighted_historical_penalty_score,
+                    "total": s.objective_score,
+                    "solver_time": format!("{:?}", s.solving_time),
+                    "assignments": sorted_assignment
+                }
+            });
+
+            all_passes_output.push(day_output);
+        }
+
+        let output_file_path = format!("{}/data/factory/GTO_november_rolling_tau_8.json", manifest_dir);
+        let mut file = File::create(&output_file_path)?;
+        
+        let pretty_json_array = serde_json::to_string_pretty(&all_passes_output)?;
+        file.write_all(pretty_json_array.as_bytes())?;
+
+        println!("Successfully wrote pure algorithmic pass rolling evaluation to: {}", output_file_path);
+
+        Ok(())
+    }
+
 }

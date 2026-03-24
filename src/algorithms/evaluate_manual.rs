@@ -158,7 +158,7 @@ mod tests {
 
         // Load the manual history data
         // Make sure this points to the file containing your manual assignment JSON
-        let history_path = format!("{}/data/factory/VCE_history.json", manifest_dir);
+        let history_path = format!("{}/data/factory/evaluation/VCE_history_part_d.json", manifest_dir);
         // let history_path = format!("{}/data/factory/VCE_algo_strat_1_rolling_part_a.json", manifest_dir);
         let history_content = fs::read_to_string(history_path)?;
         let history_wrapper: Vec<DayWrapper> = serde_json::from_str(&history_content)?;
@@ -178,8 +178,8 @@ mod tests {
         if let Some(station) = matrix.stations.get("CE") {
             // Explicitly define the date you want to evaluate
             let target_year = 2026;
-            let target_month = 1;
-            let target_date = 23;
+            let target_month = 2;
+            let target_date = 27;
 
             // Find the index of that specific day in the history array
             let target_index = history
@@ -267,7 +267,7 @@ mod tests {
         let matrix: Matrix = serde_json::from_str(&json_content)?;
 
         // 2. Load the Manual History
-        let history_path = format!("{}/data/factory/VCE_history.json", manifest_dir);
+        let history_path = format!("{}/data/factory/VCE_history_part_d.json", manifest_dir);
         let history_content = fs::read_to_string(history_path)?;
         let history_wrapper: Vec<DayWrapper> = serde_json::from_str(&history_content)?;
         let full_history: Vec<Day> = history_wrapper.into_iter().map(|dw| dw.day).collect();
@@ -342,13 +342,125 @@ mod tests {
         }
 
         // 8. Write the results to a file
-        let output_file_path = format!("{}/data/factory/manual_evaluation_output.json", manifest_dir);
+        let output_file_path = format!("{}/data/factory/VCE_manual_part_d.json", manifest_dir);
         let mut file = File::create(&output_file_path)?;
         
         let pretty_json_array = serde_json::to_string_pretty(&all_days_output)?;
         file.write_all(pretty_json_array.as_bytes())?;
 
         println!("Successfully wrote manual evaluations to: {}", output_file_path);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_evaluate_manual_passes_to_file() -> Result<(), Box<dyn std::error::Error>> {
+        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
+
+        // 1. Load the Matrix
+        let path = format!("{}/data/factory/GTO_matrix.json", manifest_dir); // Ensure correct matrix file
+        let json_content = fs::read_to_string(path)?;
+        let matrix: Matrix = serde_json::from_str(&json_content)?;
+
+        // 2. Load the Manual Pass History
+        let history_path = format!("{}/data/factory/GTO_nov_history.json", manifest_dir); // Ensure correct history file
+        let history_content = fs::read_to_string(history_path)?;
+        let history_wrapper: Vec<PassWrapper> = serde_json::from_str(&history_content)?;
+        let full_passes: Vec<Pass> = history_wrapper.into_iter().map(|pw| pw.pass).collect();
+
+        // 3. Algorithm/Evaluation Parameters
+        let offset = 2000;
+        let omega = 1;
+        let alpha = 192;
+        let beta = 384;
+        let tau = 8; // 20 passes = 5 days
+        let gamma = 24;
+
+        let station_id = "GTO";
+        let station_data = matrix.stations.get(station_id).expect("Station GTO not found in matrix");
+
+        // 4. Identify the Team Leader dynamically from the matrix role
+        let leader_name = station_data
+            .people
+            .iter()
+            .find(|p| matches!(p.role, Role::TeamLeader))
+            .map(|p| p.name.clone())
+            .unwrap_or_default();
+
+        let mut all_passes_output = Vec::new();
+
+        // 5. Iterate pass by pass, starting from index 1
+        for i in 1..full_passes.len() {
+            let current_pass = &full_passes[i];
+            
+            // Extract the history window (up to tau passes in the past)
+            let start_idx = if i > tau as usize { i - (tau as usize) } else { 0 };
+            let history_window_passes = full_passes[start_idx..i].to_vec();
+
+            // Map Pass to Day so the evaluator function can digest it
+            let history_window_days: Vec<Day> = history_window_passes.iter().map(|p| {
+                Day {
+                    date: p.date.clone(), 
+                    station: p.station.clone(),
+                    leader: leader_name.clone(), 
+                    assignments: p.assignments.clone(), 
+                }
+            }).collect();
+
+            // Track how fast the manual evaluation runs
+            let start_time = Instant::now();
+
+            // 6. Run the Manual Evaluation
+            let manual_scores = evaluate_manual_assignment(
+                station_data,
+                history_window_days,
+                &current_pass.assignments, // Evaluate exactly what the human assigned
+                offset,
+                omega,
+                alpha,
+                beta,
+                tau,
+                gamma,
+            );
+
+            let elapsed_time = start_time.elapsed();
+
+            // 7. Sort assignments for consistent JSON output
+            let mut sorted_assignment = current_pass.assignments.clone();
+            sorted_assignment.sort_by(|(e1, _), (e2, _)| e1.cmp(e2));
+
+            // 8. Build the JSON output matching your pass schema
+            let day_output = json!({
+                "pass": {
+                    "date": {
+                        "year": current_pass.date.year,
+                        "month": current_pass.date.month,
+                        "day": current_pass.date.day
+                    },
+                    "station": station_id,
+                    "pass": current_pass.pass,
+                    "offset": manual_scores.offset,
+                    "pref": manual_scores.weighted_preference_reward_score,
+                    "lead": manual_scores.weighted_leader_penalty_score,
+                    "exte": manual_scores.weighted_external_penalty_score,
+                    "hist_ergo": manual_scores.weighted_historical_penalty_score,
+                    "total": manual_scores.objective_score,
+                    "solver_time": format!("{:?}", elapsed_time),
+                    "assignments": sorted_assignment
+                }
+            });
+
+            all_passes_output.push(day_output);
+        }
+
+        // 9. Write the results to a file
+        let output_file_path = format!("{}/data/factory/GTO_november_manual_tau_8.json", manifest_dir);
+        let mut file = File::create(&output_file_path)?;
+        
+        let pretty_json_array = serde_json::to_string_pretty(&all_passes_output)?;
+        file.write_all(pretty_json_array.as_bytes())?;
+
+        println!("Successfully wrote manual pass evaluations to: {}", output_file_path);
 
         Ok(())
     }

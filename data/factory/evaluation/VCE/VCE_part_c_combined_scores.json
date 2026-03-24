@@ -1,0 +1,38 @@
+    [
+        {
+            "day": {
+                "date": {
+                    "year": 2026,
+                    "month": 2,
+                    "day": 11
+                },
+                "manual": 1501,
+                "initial": 1501,
+                "rolling": 1501
+            }
+        },
+        {
+            "day": {
+                "date": {
+                    "year": 2026,
+                    "month": 2,
+                    "day": 16
+                },
+                "manual": 1407,
+                "initial": 1500,
+                "rolling": 1500
+            }
+        },
+        {
+            "day": {
+                "date": {
+                    "year": 2026,
+                    "month": 2,
+                    "day": 17
+                },
+                "manual": 1770,
+                "initial": 1896,
+                "rolling": 1873
+            }
+        }
+    ]

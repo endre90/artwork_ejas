@@ -1,0 +1,63 @@
+    [
+        {
+            "day": {
+                "date": {
+                    "year": 2026,
+                    "month": 2,
+                    "day": 2
+                },
+                "manual": 1852,
+                "initial": 1852,
+                "rolling": 1852
+            }
+        },
+        {
+            "day": {
+                "date": {
+                    "year": 2026,
+                    "month": 2,
+                    "day": 3
+                },
+                "manual": 1780,
+                "initial": 1907,
+                "rolling": 1907
+            }
+        },
+        {
+            "day": {
+                "date": {
+                    "year": 2026,
+                    "month": 2,
+                    "day": 4
+                },
+                "manual": 1814,
+                "initial": 1905,
+                "rolling": 1883
+            }
+        },
+        {
+            "day": {
+                "date": {
+                    "year": 2026,
+                    "month": 2,
+                    "day": 5
+                },
+                "manual": 1841,
+                "initial": 1884,
+                "rolling": 1872
+            }
+        }
+        ,
+        {
+            "day": {
+                "date": {
+                    "year": 2026,
+                    "month": 2,
+                    "day": 6
+                },
+                "manual": 1156,
+                "initial": 1894,
+                "rolling": 1789
+            }
+        }
+    ]
