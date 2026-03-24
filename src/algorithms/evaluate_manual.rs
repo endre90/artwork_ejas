@@ -143,7 +143,8 @@ pub fn evaluate_manual_assignment(
 #[cfg(test)]
 mod tests {
     use crate::{algorithms::evaluate_manual::evaluate_manual_assignment, *};
-    use std::fs; // Assuming types like DayWrapper, Matrix, Day, etc. are here
+    use std::{fs::{self, File}, io::Write, time::Instant}; // Assuming types like DayWrapper, Matrix, Day, etc. are here
+        use serde_json::json;
 
     #[test]
     fn test_evaluate_manual() -> Result<(), Box<dyn std::error::Error>> {
@@ -252,6 +253,102 @@ mod tests {
         } else {
             println!("Station 'CE' not found in matrix.");
         }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_evaluate_manual_to_file() -> Result<(), Box<dyn std::error::Error>> {
+        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
+
+        // 1. Load the Matrix
+        let path = format!("{}/data/factory/VCE_matrix.json", manifest_dir);
+        let json_content = fs::read_to_string(path)?;
+        let matrix: Matrix = serde_json::from_str(&json_content)?;
+
+        // 2. Load the Manual History
+        let history_path = format!("{}/data/factory/VCE_history.json", manifest_dir);
+        let history_content = fs::read_to_string(history_path)?;
+        let history_wrapper: Vec<DayWrapper> = serde_json::from_str(&history_content)?;
+        let full_history: Vec<Day> = history_wrapper.into_iter().map(|dw| dw.day).collect();
+
+        // 3. Algorithm/Evaluation Parameters
+        let offset = 2000;
+        let omega = 1;
+        let alpha = 192;
+        let beta = 384;
+        let tau = 5;
+        let gamma = 24;
+
+        let station_id = "CE";
+        let station_data = matrix.stations.get(station_id).expect("Station CE not found in matrix");
+
+        let mut all_days_output = Vec::new();
+
+        // 4. Iterate day by day, starting from index 1 (to have at least 1 day of history)
+        for i in 1..full_history.len() {
+            let current_day = &full_history[i];
+            let date = &current_day.date;
+            let leader = &current_day.leader;
+
+            // Extract the history window (up to tau days in the past)
+            let start_idx = if i > tau as usize { i - (tau as usize) } else { 0 };
+            let history_window = full_history[start_idx..i].to_vec();
+
+            // Track how fast the manual evaluation runs just to keep the JSON schema consistent
+            let start_time = Instant::now();
+
+            // 5. Run the Manual Evaluation
+            let manual_scores = evaluate_manual_assignment(
+                station_data,
+                history_window,
+                &current_day.assignments,
+                offset,
+                omega,
+                alpha,
+                beta,
+                tau,
+                gamma,
+            );
+
+            let elapsed_time = start_time.elapsed();
+
+            // 6. Sort assignments for consistent JSON output
+            let mut sorted_assignment = current_day.assignments.clone();
+            sorted_assignment.sort_by(|(e1, _), (e2, _)| e1.cmp(e2));
+
+            // 7. Build the JSON output matching your algorithm output schema
+            let day_output = json!({
+                "day": {
+                    "date": {
+                        "year": date.year,
+                        "month": date.month,
+                        "day": date.day
+                    },
+                    "offset": manual_scores.offset,
+                    "pref": manual_scores.weighted_preference_reward_score,
+                    "lead": manual_scores.weighted_leader_penalty_score,
+                    "exte": manual_scores.weighted_external_penalty_score,
+                    "hist_ergo": manual_scores.weighted_historical_penalty_score,
+                    "total": manual_scores.objective_score,
+                    "solver_time": format!("{:?}", elapsed_time),
+                    "station": station_id,
+                    "leader": leader,
+                    "assignments": sorted_assignment
+                }
+            });
+
+            all_days_output.push(day_output);
+        }
+
+        // 8. Write the results to a file
+        let output_file_path = format!("{}/data/factory/manual_evaluation_output.json", manifest_dir);
+        let mut file = File::create(&output_file_path)?;
+        
+        let pretty_json_array = serde_json::to_string_pretty(&all_days_output)?;
+        file.write_all(pretty_json_array.as_bytes())?;
+
+        println!("Successfully wrote manual evaluations to: {}", output_file_path);
 
         Ok(())
     }
