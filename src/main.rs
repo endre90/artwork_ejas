@@ -1,463 +1,842 @@
-use rusqlite::{params, Connection, Result};
-use inquire::{ui::{Attributes, Color, RenderConfig, StyleSheet, Styled}, MultiSelect, Password, Select, Text};
+// use eframe::egui;
+// use std::collections::HashMap;
 
-// should have option to view history
-// need a help option probably
-// save history up till 6 months
-// encrypted database? probably no need to do that for now, neither anonymization
-// we can do some analytics based on the collected information, and show that the algorithm will actually perform better
-// start with a random historical distribution of 2 weeks, just noise, in order to predisct sho should do what
-// and then use the historic data every day to schedule fair task allocation
-// we probably don't need a long horizon, just the passes for the day
-// ensure that database is not lost, automatic backup somewhere, or send it somewhere?
-// quick way of selecting who is here today so that we can get a quick job allocation
-// overview for the next passes over the day (4 passes per day)
-// probably don't need to know who is doing what tomorrow, just for the day
-// but need to able to change the allocation if somebody leaves during the day
-// keep track of dates and times
+// // Enum to track the availability of an operator
+// #[derive(PartialEq, Clone, Copy, Debug)]
+// enum OperatorStatus {
+//     Available,
+//     Absent,
+//     Training,
+//     Loaned,
+// }
 
-fn main() -> Result<()> {
-    // Connect to the SQLite database (or create it if it doesn't exist)
-    let conn = Connection::open("people.db")?;
+// struct FactoryApp {
+//     // Core data
+//     operators: Vec<String>,
+//     operations: Vec<String>,
 
-    // Create the necessary tables if they don't exist
-    setup_database(&conn)?;
+//     // State
+//     statuses: HashMap<String, OperatorStatus>,
+//     forced_assignments: HashMap<String, String>,
+//     team_leader: Option<String>,
 
-    // Check if any managers exist
-    let managing_users_count: i32 = conn.query_row(
-        "SELECT COUNT(*) FROM users WHERE role = 'Managing'",
-        [],
-        |row| row.get(0),
-    )?;
+//     // Result
+//     calculated_assignments: Option<Vec<(String, String)>>,
+// }
 
-    if managing_users_count == 0 {
-        // No managing users exist, enter setup mode
-        println!("No managing users found. Entering setup mode to create the first manager.");
-        setup_first_manager(&conn)?;
-    } else {
-        // Normal login process
-        login(&conn)?;
-    }
+// impl Default for FactoryApp {
+//     fn default() -> Self {
+//         // Initialize operators A through K
+//         let operators = (b'A'..=b'K')
+//             .map(|c| (c as char).to_string())
+//             .collect::<Vec<_>>();
 
-    Ok(())
+//         // Initialize operations O1 through O8
+//         let operations = (1..=8)
+//             .map(|n| format!("O{}", n))
+//             .collect::<Vec<_>>();
+
+//         let mut statuses = HashMap::new();
+//         for op in &operators {
+//             statuses.insert(op.clone(), OperatorStatus::Available);
+//         }
+
+//         Self {
+//             operators,
+//             operations,
+//             statuses,
+//             forced_assignments: HashMap::new(),
+//             team_leader: None,
+//             calculated_assignments: None,
+//         }
+//     }
+// }
+
+// impl eframe::App for FactoryApp {
+//     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+//         // Use a central panel with a clean background
+//         egui::CentralPanel::default().show(ctx, |ui| {
+//             ui.heading("Ergonomic Assigner");
+//             ui.add_space(10.0);
+
+//             // Scrollable area for the operator list
+//             egui::ScrollArea::vertical().show(ui, |ui| {
+//                 for operator in &self.operators {
+//                     ui.group(|ui| {
+//                         ui.horizontal(|ui| {
+//                             // 1. Operator Name
+//                             ui.label(egui::RichText::new(operator).size(18.0).strong());
+//                             ui.add_space(10.0);
+
+//                             // 2. Status Dropdown
+//                             let mut current_status = self.statuses[operator];
+//                             egui::ComboBox::from_id_source(format!("{}_status", operator))
+//                                 .selected_text(format!("{:?}", current_status))
+//                                 .show_ui(ui, |ui| {
+//                                     ui.selectable_value(&mut current_status, OperatorStatus::Available, "Available");
+//                                     ui.selectable_value(&mut current_status, OperatorStatus::Absent, "Absent (E)");
+//                                     ui.selectable_value(&mut current_status, OperatorStatus::Training, "Training (T)");
+//                                     ui.selectable_value(&mut current_status, OperatorStatus::Loaned, "Loaned (L)");
+//                                 });
+
+//                             if current_status != self.statuses[operator] {
+//                                 self.statuses.insert(operator.clone(), current_status);
+//                                 // If they are no longer available, remove any forced assignments
+//                                 if current_status != OperatorStatus::Available {
+//                                     self.forced_assignments.remove(operator);
+//                                 }
+//                             }
+
+//                             // 3. Team Leader Toggle
+//                             let mut is_tl = self.team_leader.as_ref() == Some(operator);
+//                             if ui.toggle_value(&mut is_tl, "TL").clicked() {
+//                                 if is_tl {
+//                                     self.team_leader = Some(operator.clone());
+//                                 } else if self.team_leader.as_ref() == Some(operator) {
+//                                     self.team_leader = None;
+//                                 }
+//                             }
+//                         });
+
+//                         // 4. Forced Assignment (Only show if Available)
+//                         if self.statuses[operator] == OperatorStatus::Available {
+//                             ui.horizontal(|ui| {
+//                                 ui.label("Force Operation:");
+//                                 let mut current_forced = self.forced_assignments
+//                                     .get(operator)
+//                                     .cloned()
+//                                     .unwrap_or_else(|| "None".to_string());
+
+//                                 egui::ComboBox::from_id_source(format!("{}_force", operator))
+//                                     .selected_text(&current_forced)
+//                                     .show_ui(ui, |ui| {
+//                                         ui.selectable_value(&mut current_forced, "None".to_string(), "None");
+//                                         ui.separator();
+//                                         for op in &self.operations {
+//                                             ui.selectable_value(&mut current_forced, op.clone(), op.clone());
+//                                         }
+//                                     });
+
+//                                 if current_forced == "None" {
+//                                     self.forced_assignments.remove(operator);
+//                                 } else {
+//                                     self.forced_assignments.insert(operator.clone(), current_forced);
+//                                 }
+//                             });
+//                         }
+//                     });
+//                     ui.add_space(5.0);
+//                 }
+//             });
+
+//             ui.add_space(10.0);
+//             ui.separator();
+//             ui.add_space(10.0);
+
+//             // Calculate Button
+//             let calculate_btn = egui::Button::new(egui::RichText::new("Calculate Assignments").size(20.0))
+//                 .fill(egui::Color32::from_rgb(45, 120, 200)); // Nice blue button
+
+//             if ui.add_sized([ui.available_width(), 40.0], calculate_btn).clicked() {
+//                 self.run_algorithm();
+//             }
+
+//             // Results Display
+//             if let Some(assignments) = &self.calculated_assignments {
+//                 ui.add_space(10.0);
+//                 ui.heading("Results:");
+//                 egui::ScrollArea::vertical().id_source("results_scroll").show(ui, |ui| {
+//                     egui::Grid::new("results_grid")
+//                         .striped(true)
+//                         .spacing([40.0, 8.0])
+//                         .show(ui, |ui| {
+//                             ui.label(egui::RichText::new("Operator").strong());
+//                             ui.label(egui::RichText::new("Task/Operation").strong());
+//                             ui.end_row();
+
+//                             for (op, task) in assignments {
+//                                 ui.label(op);
+//                                 ui.label(task);
+//                                 ui.end_row();
+//                             }
+//                         });
+//                 });
+//             }
+//         });
+//     }
+// }
+
+// impl FactoryApp {
+//     fn run_algorithm(&mut self) {
+//         // 1. Extract lists for your algorithm based on UI state
+//         let mut absent = Vec::new();
+//         let mut training = Vec::new();
+//         let mut loaned = Vec::new();
+
+//         for (operator, status) in &self.statuses {
+//             match status {
+//                 OperatorStatus::Absent => absent.push(operator.clone()),
+//                 OperatorStatus::Training => training.push(operator.clone()),
+//                 OperatorStatus::Loaned => loaned.push(operator.clone()),
+//                 OperatorStatus::Available => {}
+//             }
+//         }
+
+//         // 2. Format forced assignments into tuples
+//         let forced_assignments_vec: Vec<(String, String)> = self.forced_assignments
+//             .iter()
+//             .map(|(k, v)| (k.clone(), v.clone()))
+//             .collect();
+
+//         // 3. THIS IS WHERE YOU CALL YOUR BACKEND
+//         //
+//         // let s: ErgonomicAssignmentSolution = calculate_ergonomic_assignment(
+//         //     station_data,
+//         //     history_window_days, // You may need to load this from disk on app startup
+//         //     2000, 1, 192, 384, 8, 24, // Algorithm params
+//         //     &forced_assignments_vec,
+//         //     &loaned,
+//         //     &absent,
+//         //     &training,
+//         //     &vec![] // Supervision
+//         // );
+//         // let mut sorted_assignment = s.internal_assignments.to_vec();
+
+//         // --- MOCK BACKEND LOGIC FOR DEMONSTRATION ---
+//         let mut sorted_assignment = Vec::new();
+//         for op in &self.operators {
+//             if absent.contains(op) { sorted_assignment.push((op.clone(), "E".to_string())); }
+//             else if training.contains(op) { sorted_assignment.push((op.clone(), "T".to_string())); }
+//             else if loaned.contains(op) { sorted_assignment.push((op.clone(), "L".to_string())); }
+//             else if Some(op) == self.team_leader.as_ref() { sorted_assignment.push((op.clone(), "TL".to_string())); }
+//             else if let Some(forced) = self.forced_assignments.get(op) {
+//                 sorted_assignment.push((op.clone(), forced.clone()));
+//             } else {
+//                 sorted_assignment.push((op.clone(), "Algorithm Pick".to_string())); // Mock assignment
+//             }
+//         }
+//         // ---------------------------------------------
+
+//         sorted_assignment.sort_by(|(e1, _), (e2, _)| e1.cmp(e2));
+
+//         // 4. Update the UI state with results
+//         self.calculated_assignments = Some(sorted_assignment);
+//     }
+// }
+
+// fn main() -> eframe::Result<()> {
+//     // Configure to look somewhat like a mobile device dimensions
+//     let mut native_options = eframe::NativeOptions::default();
+//     native_options.viewport.inner_size = Some(egui::vec2(400.0, 750.0));
+//     native_options.viewport.min_inner_size = Some(egui::vec2(350.0, 500.0));
+
+//     eframe::run_native(
+//         "Station Assigner",
+//         native_options,
+//         Box::new(|_cc| Box::<FactoryApp>::default()),
+//     )
+// }
+
+use artwork_ejas::{Day, Matrix, Pass, PassWrapper, calculate_ergonomic_assignment};
+use eframe::egui;
+use std::collections::HashMap;
+
+// Enum now includes Supervision
+#[derive(PartialEq, Clone, Copy, Debug)]
+enum OperatorStatus {
+    Available,
+    Absent,
+    Training,
+    Loaned,
+    Supervision,
 }
 
-fn custom_renrer_config() -> RenderConfig<'static> {
-    let mut config = RenderConfig::default();
-    config.selected_option = Some(StyleSheet::new().with_fg(Color::DarkGreen));
-    config.answer = StyleSheet::new().with_fg(Color::DarkGreen).with_attr(Attributes::BOLD);
-    config.highlighted_option_prefix = Styled::new(" ->").with_fg(Color::DarkGreen).with_attr(Attributes::BOLD);
-    config
+struct FactoryApp {
+    // Core data
+    operators: Vec<String>,
+    operations: Vec<String>,
+
+    // State
+    statuses: HashMap<String, OperatorStatus>,
+    forced_assignments: HashMap<String, String>,
+    team_leader: Option<String>,
+    // Track Supervision status separately or via enum.
+    // Given 'S' is listed next to 'T', 'L', 'E' (statuses),
+    // it makes sense to treat it as an exclusive status for simplicity in this mock.
+
+    // Result
+    calculated_assignments: Option<Vec<(String, String)>>,
 }
 
-fn setup_database(conn: &Connection) -> Result<()> {
-    // Create the 'people' table if it doesn't exist
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS people (
-                  id INTEGER PRIMARY KEY,
-                  name TEXT NOT NULL,
-                  job TEXT NOT NULL
-                  )",
-        [],
-    )?;
+impl Default for FactoryApp {
+    fn default() -> Self {
+        let operators = (b'A'..=b'K')
+            .map(|c| (c as char).to_string())
+            .collect::<Vec<_>>();
 
-    // Create the 'competences' table if it doesn't exist
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS competences (
-                  id INTEGER PRIMARY KEY,
-                  name TEXT NOT NULL UNIQUE
-                  )",
-        [],
-    )?;
+        let operations = (1..=8).map(|n| format!("O{}", n)).collect::<Vec<_>>();
 
-    // Create the 'person_competences' table to link people with competences
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS person_competences (
-                  person_id INTEGER,
-                  competence_id INTEGER,
-                  FOREIGN KEY(person_id) REFERENCES people(id),
-                  FOREIGN KEY(competence_id) REFERENCES competences(id),
-                  PRIMARY KEY(person_id, competence_id)
-                  )",
-        [],
-    )?;
+        let mut statuses = HashMap::new();
+        for op in &operators {
+            statuses.insert(op.clone(), OperatorStatus::Available);
+        }
 
-    // Create the 'users' table to store managing users and operators
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS users (
-                  id INTEGER PRIMARY KEY,
-                  username TEXT NOT NULL UNIQUE,
-                  password TEXT,   -- Only managing users need a password
-                  role TEXT NOT NULL  -- 'Managing' or 'Operator'
-                  )",
-        [],
-    )?;
-
-    Ok(())
-}
-
-// Function to handle first-time setup (create first manager)
-fn setup_first_manager(conn: &Connection) -> Result<()> {
-    println!("Create the first managing user:");
-    
-    let username = Text::new("Enter username for the first manager:").prompt().unwrap();
-    let password = Password::new("Enter password for the first manager:").prompt().unwrap();
-
-    // Insert the first managing user into the 'users' table
-    conn.execute(
-        "INSERT INTO users (username, password, role) VALUES (?1, ?2, 'Managing')",
-        params![username, password],
-    )?;
-
-    println!("First managing user created successfully.");
-    Ok(())
-}
-
-
-// Function to handle login and routing based on user role
-fn login(conn: &Connection) -> Result<()> {
-
-
-
-    // Select whether to log in as Managing or Operator
-    let role = Select::new("Select your role:", vec!["Managing", "Operator"])
-    .with_render_config(custom_renrer_config())
-        .prompt()
-        .unwrap();
-
-    match role {
-        "Managing" => managing_login(conn),
-        "Operator" => operator_login(conn),
-        _ => Ok(()),
-    }
-}
-
-// Managing user login function
-fn managing_login(conn: &Connection) -> Result<()> {
-    let username = Text::new("Enter username:").prompt().unwrap();
-    let password = Password::new("Enter password:").without_confirmation().prompt().unwrap();
-
-    // Validate managing user
-    let valid_user = conn.query_row(
-        "SELECT COUNT(*) FROM users WHERE username = ?1 AND password = ?2 AND role = 'Managing'",
-        params![username, password],
-        |row| row.get::<_, i32>(0),
-    )?;
-
-    if valid_user == 1 {
-        println!("Managing user logged in.");
-        managing_menu(conn)
-    } else {
-        println!("Invalid username or password.");
-        Ok(())
-    }
-}
-
-// Operator login function
-fn operator_login(conn: &Connection) -> Result<()> {
-    let username = Text::new("Enter your name:").prompt().unwrap();
-
-    // Validate if the user is an operator
-    let valid_user = conn.query_row(
-        "SELECT COUNT(*) FROM users WHERE username = ?1 AND role = 'Operator'",
-        params![username],
-        |row| row.get::<_, i32>(0),
-    )?;
-
-    if valid_user == 1 {
-        println!("Operator logged in.");
-        operator_menu(conn, username)
-    } else {
-        println!("Invalid operator name.");
-        Ok(())
-    }
-}
-
-// Menu for managing users
-fn managing_menu(conn: &Connection) -> Result<()> {
-    loop {
-        let choice = Select::new("Managing menu:", vec![
-            "Add a new Operator",
-            "Remove an Operator",
-            "Add a new Manager",
-            "Add new Competence",
-            "Assign Competences to Operator",
-            "Overview of Operators and Competences",  // New Option
-            "Exit"
-        ])
-        .prompt()
-        .unwrap();
-
-        match choice {
-            "Add a new Operator" => add_operator(conn)?,
-            "Remove an Operator" => remove_operator(conn)?,
-            "Add a new Manager" => add_manager(conn)?,
-            "Add new Competence" => add_competence(conn)?,
-            "Assign Competences to Operator" => assign_competences_to_operator(conn)?,
-            "Overview of Operators and Competences" => overview_operators_competences(conn)?,  // New functionality
-            "Exit" => break,
-            _ => (),
+        Self {
+            operators,
+            operations,
+            statuses,
+            forced_assignments: HashMap::new(),
+            team_leader: None,
+            calculated_assignments: None,
         }
     }
-
-    Ok(())
 }
 
-// Menu for operators
-fn operator_menu(conn: &Connection, username: String) -> Result<()> {
-    loop {
-        let choice = Select::new("Operator menu:", vec![
-            "Change your job preference",
-            "Exit"
-        ])
-        .prompt()
-        .unwrap();
+// impl eframe::App for FactoryApp {
+//     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+//         egui::CentralPanel::default().show(ctx, |ui| {
+//             // Larger Heading
+//             ui.heading(egui::RichText::new("Ergonomic Assigner").size(30.0));
+//             ui.add_space(15.0);
 
-        match choice {
-            "Change your job preference" => change_job_preference(conn, &username)?,
-            "Exit" => break,
-            _ => (),
-        }
+//             // Use horizontal layout to split input and results
+//             ui.horizontal(|ui| {
+//                 // --- Left Column: Assignments ---
+//                 ui.allocate_ui_with_layout(
+//                     egui::vec2(ui.available_width() * 0.55, ui.available_height()),
+//                     egui::Layout::top_down(egui::Align::LEFT),
+//                     |ui| {
+//                         ui.heading(egui::RichText::new("Operator Configuration").size(22.0));
+//                         ui.add_space(10.0);
+
+//                         egui::ScrollArea::vertical()
+//                             .id_source("ops_scroll")
+//                             .show(ui, |ui| {
+//                                 for operator in &self.operators {
+//                                     ui.group(|ui| {
+//                                         // Use vertical layout inside group for more space
+//                                         ui.vertical(|ui| {
+//                                             ui.horizontal(|ui| {
+//                                                 // 1. Larger Operator Name
+//                                                 ui.label(
+//                                                     egui::RichText::new(format!(
+//                                                         "Operator {}",
+//                                                         operator
+//                                                     ))
+//                                                     .size(20.0)
+//                                                     .strong(),
+//                                                 );
+//                                                 ui.add_space(20.0);
+
+//                                                 // 2. Team Leader Toggle
+//                                                 let mut is_tl =
+//                                                     self.team_leader.as_ref() == Some(operator);
+//                                                 if ui
+//                                                     .add(egui::SelectableLabel::new(
+//                                                         is_tl,
+//                                                         egui::RichText::new("TL").size(16.0),
+//                                                     ))
+//                                                     .clicked()
+//                                                 {
+//                                                     if is_tl {
+//                                                         self.team_leader = None;
+//                                                     } else {
+//                                                         self.team_leader = Some(operator.clone());
+//                                                     }
+//                                                 }
+//                                             });
+
+//                                             ui.add_space(5.0);
+
+//                                             ui.horizontal(|ui| {
+//                                                 // 3. Larger Status Dropdown (now includes Supervision)
+//                                                 ui.label(egui::RichText::new("Status:").size(16.0));
+//                                                 let mut current_status = self.statuses[operator];
+//                                                 let combo_reps = egui::ComboBox::from_id_source(
+//                                                     format!("{}_status", operator),
+//                                                 )
+//                                                 .width(150.0)
+//                                                 .selected_text(
+//                                                     egui::RichText::new(format!(
+//                                                         "{:?}",
+//                                                         current_status
+//                                                     ))
+//                                                     .size(16.0),
+//                                                 )
+//                                                 .show_ui(ui, |ui| {
+//                                                     // Use RichText directly on the selectable values instead of mutating the style
+//                                                     ui.selectable_value(
+//                                                         &mut current_status,
+//                                                         OperatorStatus::Available,
+//                                                         egui::RichText::new("Available").size(16.0),
+//                                                     );
+//                                                     ui.selectable_value(
+//                                                         &mut current_status,
+//                                                         OperatorStatus::Absent,
+//                                                         egui::RichText::new("Absent (E)")
+//                                                             .size(16.0),
+//                                                     );
+//                                                     ui.selectable_value(
+//                                                         &mut current_status,
+//                                                         OperatorStatus::Training,
+//                                                         egui::RichText::new("Training (T)")
+//                                                             .size(16.0),
+//                                                     );
+//                                                     ui.selectable_value(
+//                                                         &mut current_status,
+//                                                         OperatorStatus::Loaned,
+//                                                         egui::RichText::new("Loaned (L)")
+//                                                             .size(16.0),
+//                                                     );
+//                                                     ui.selectable_value(
+//                                                         &mut current_status,
+//                                                         OperatorStatus::Supervision,
+//                                                         egui::RichText::new("Supervision (S)")
+//                                                             .size(16.0),
+//                                                     );
+//                                                 });
+
+//                                                 if current_status != self.statuses[operator] {
+//                                                     self.statuses
+//                                                         .insert(operator.clone(), current_status);
+//                                                     if current_status != OperatorStatus::Available {
+//                                                         self.forced_assignments.remove(operator);
+//                                                     }
+//                                                 }
+//                                             });
+
+//                                             // 4. Forced Assignment (Only show if Available)
+//                                             if self.statuses[operator] == OperatorStatus::Available
+//                                             {
+//                                                 ui.add_space(5.0);
+//                                                 ui.horizontal(|ui| {
+//                                                     ui.label(
+//                                                         egui::RichText::new("Force Op:").size(16.0),
+//                                                     );
+//                                                     let mut current_forced = self
+//                                                         .forced_assignments
+//                                                         .get(operator)
+//                                                         .cloned()
+//                                                         .unwrap_or_else(|| "None".to_string());
+
+//                                                     egui::ComboBox::from_id_source(format!(
+//                                                         "{}_force",
+//                                                         operator
+//                                                     ))
+//                                                     .width(100.0)
+//                                                     .selected_text(
+//                                                         egui::RichText::new(&current_forced)
+//                                                             .size(16.0),
+//                                                     )
+//                                                     .show_ui(ui, |ui| {
+//                                                         // Again, use RichText for the options
+//                                                         ui.selectable_value(
+//                                                             &mut current_forced,
+//                                                             "None".to_string(),
+//                                                             egui::RichText::new("None").size(16.0),
+//                                                         );
+//                                                         ui.separator();
+//                                                         for op in &self.operations {
+//                                                             ui.selectable_value(
+//                                                                 &mut current_forced,
+//                                                                 op.clone(),
+//                                                                 egui::RichText::new(op).size(16.0),
+//                                                             );
+//                                                         }
+//                                                     });
+//                                                     if current_forced == "None" {
+//                                                         self.forced_assignments.remove(operator);
+//                                                     } else {
+//                                                         self.forced_assignments.insert(
+//                                                             operator.clone(),
+//                                                             current_forced,
+//                                                         );
+//                                                     }
+//                                                 });
+//                                             }
+//                                         });
+//                                     });
+//                                     ui.add_space(10.0); // More space between operators
+//                                 }
+//                             });
+//                     },
+//                 );
+
+//                 // --- Separator ---
+//                 ui.add(egui::Separator::default().vertical());
+//                 ui.add_space(10.0);
+
+//                 // --- Right Column: Calculation & Results ---
+//                 ui.vertical(|ui| {
+//                     // Larger Calculate Button
+//                     let calculate_btn = egui::Button::new(
+//                         egui::RichText::new("Calculate Assignments")
+//                             .size(22.0)
+//                             .strong(),
+//                     )
+//                     .fill(egui::Color32::from_rgb(45, 120, 200))
+//                     .min_size(egui::vec2(0.0, 50.0)); // Taller button
+
+//                     if ui
+//                         .add_sized([ui.available_width(), 50.0], calculate_btn)
+//                         .clicked()
+//                     {
+//                         self.run_algorithm();
+//                     }
+
+//                     ui.add_space(20.0);
+
+//                     // Results Display
+//                     if let Some(assignments) = &self.calculated_assignments {
+//                         ui.heading(egui::RichText::new("Results:").size(24.0));
+//                         ui.add_space(10.0);
+//                         egui::ScrollArea::vertical()
+//                             .id_source("results_scroll")
+//                             .show(ui, |ui| {
+//                                 egui::Grid::new("results_grid")
+//                                     .striped(true)
+//                                     .spacing([20.0, 12.0]) // Increased grid spacing
+//                                     .show(ui, |ui| {
+//                                         ui.label(
+//                                             egui::RichText::new("Operator").size(18.0).strong(),
+//                                         );
+//                                         ui.label(
+//                                             egui::RichText::new("Task/Operation")
+//                                                 .size(18.0)
+//                                                 .strong(),
+//                                         );
+//                                         ui.end_row();
+
+//                                         for (op, task) in assignments {
+//                                             ui.label(egui::RichText::new(op).size(18.0));
+//                                             ui.label(egui::RichText::new(task).size(18.0));
+//                                             ui.end_row();
+//                                         }
+//                                     });
+//                             });
+//                     } else {
+//                         ui.label(
+//                             egui::RichText::new("Click Calculate to see assignments.")
+//                                 .size(16.0)
+//                                 .italics(),
+//                         );
+//                     }
+//                 });
+//             });
+//         });
+//     }
+// }
+
+impl eframe::App for FactoryApp {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        
+        // 1. TOP PANEL: Title
+        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
+            ui.add_space(10.0);
+            ui.heading(egui::RichText::new("Ergonomic Assigner").size(30.0));
+            ui.add_space(10.0);
+        });
+
+        // 2. LEFT PANEL: Operator Configuration
+        egui::SidePanel::left("left_panel")
+            .default_width(450.0) // Give it enough default width
+            .resizable(true)      // Allow the user to drag the split
+            .show(ctx, |ui| {
+                ui.add_space(10.0);
+                ui.heading(egui::RichText::new("Operator Configuration").size(22.0));
+                ui.add_space(10.0);
+
+                egui::ScrollArea::vertical().id_source("ops_scroll").show(ui, |ui| {
+                    for operator in &self.operators {
+                        ui.group(|ui| {
+                            ui.vertical(|ui| {
+                                ui.horizontal(|ui| {
+                                    // Operator Name
+                                    ui.label(egui::RichText::new(format!("Operator {}", operator)).size(20.0).strong());
+                                    ui.add_space(20.0);
+                                    
+                                    // Team Leader Toggle
+                                    let mut is_tl = self.team_leader.as_ref() == Some(operator);
+                                    if ui.add(egui::SelectableLabel::new(is_tl, egui::RichText::new("TL").size(16.0))).clicked() {
+                                        if is_tl {
+                                            self.team_leader = None;
+                                        } else {
+                                            self.team_leader = Some(operator.clone());
+                                        }
+                                    }
+                                });
+                                
+                                ui.add_space(5.0);
+
+                                ui.horizontal(|ui| {
+                                    // Status Dropdown
+                                    ui.label(egui::RichText::new("Status:").size(16.0));
+                                    let mut current_status = self.statuses[operator];
+                                    egui::ComboBox::from_id_source(format!("{}_status", operator))
+                                        .width(150.0)
+                                        .selected_text(egui::RichText::new(format!("{:?}", current_status)).size(16.0))
+                                        .show_ui(ui, |ui| {
+                                            ui.selectable_value(&mut current_status, OperatorStatus::Available, egui::RichText::new("Available").size(16.0));
+                                            ui.selectable_value(&mut current_status, OperatorStatus::Absent, egui::RichText::new("Absent (E)").size(16.0));
+                                            ui.selectable_value(&mut current_status, OperatorStatus::Training, egui::RichText::new("Training (T)").size(16.0));
+                                            ui.selectable_value(&mut current_status, OperatorStatus::Loaned, egui::RichText::new("Loaned (L)").size(16.0));
+                                            ui.selectable_value(&mut current_status, OperatorStatus::Supervision, egui::RichText::new("Supervision (S)").size(16.0));
+                                        });
+                                    
+                                    if current_status != self.statuses[operator] {
+                                        self.statuses.insert(operator.clone(), current_status);
+                                        if current_status != OperatorStatus::Available {
+                                            self.forced_assignments.remove(operator);
+                                        }
+                                    }
+                                });
+
+                                // Forced Assignment (Only show if Available)
+                                if self.statuses[operator] == OperatorStatus::Available {
+                                    ui.add_space(5.0);
+                                    ui.horizontal(|ui| {
+                                        ui.label(egui::RichText::new("Force Op:").size(16.0));
+                                        let mut current_forced = self.forced_assignments
+                                            .get(operator)
+                                            .cloned()
+                                            .unwrap_or_else(|| "None".to_string());
+
+                                        egui::ComboBox::from_id_source(format!("{}_force", operator))
+                                            .width(100.0)
+                                            .selected_text(egui::RichText::new(&current_forced).size(16.0))
+                                            .show_ui(ui, |ui| {
+                                                ui.selectable_value(&mut current_forced, "None".to_string(), egui::RichText::new("None").size(16.0));
+                                                ui.separator();
+                                                for op in &self.operations {
+                                                    ui.selectable_value(&mut current_forced, op.clone(), egui::RichText::new(op).size(16.0));
+                                                }
+                                            });
+
+                                        if current_forced == "None" {
+                                            self.forced_assignments.remove(operator);
+                                        } else {
+                                            self.forced_assignments.insert(operator.clone(), current_forced);
+                                        }
+                                    });
+                                }
+                            });
+                        });
+                        ui.add_space(10.0);
+                    }
+                });
+            });
+
+        // 3. CENTRAL PANEL: Button and Results (Takes up remaining space)
+        egui::CentralPanel::default().show(ctx, |ui| {
+            ui.add_space(10.0);
+
+            // Calculate Button
+            let calculate_btn = egui::Button::new(egui::RichText::new("Calculate Assignments").size(22.0).strong())
+                .fill(egui::Color32::from_rgb(45, 120, 200))
+                .min_size(egui::vec2(0.0, 50.0));
+            
+            if ui.add_sized([ui.available_width(), 50.0], calculate_btn).clicked() {
+                self.run_algorithm();
+            }
+
+            ui.add_space(20.0);
+
+            // Results Display
+            if let Some(assignments) = &self.calculated_assignments {
+                ui.heading(egui::RichText::new("Results:").size(24.0));
+                ui.add_space(10.0);
+                
+                egui::ScrollArea::vertical().id_source("results_scroll").show(ui, |ui| {
+                    egui::Grid::new("results_grid")
+                        .striped(true)
+                        .spacing([40.0, 12.0])
+                        .show(ui, |ui| {
+                            ui.label(egui::RichText::new("Operator").size(18.0).strong());
+                            ui.label(egui::RichText::new("Task/Operation").size(18.0).strong());
+                            ui.end_row();
+
+                            for (op, task) in assignments {
+                                ui.label(egui::RichText::new(op).size(18.0));
+                                ui.label(egui::RichText::new(task).size(18.0));
+                                ui.end_row();
+                            }
+                        });
+                });
+            } else {
+                ui.label(egui::RichText::new("Click Calculate to see assignments.").size(16.0).italics());
+            }
+        });
     }
-
-    Ok(())
 }
 
-fn add_operator(conn: &Connection) -> Result<()> {
-    // Prompt the user for the operator's name or to cancel by pressing Enter with empty input
-    let username = Text::new("Enter new Operator's name:")
-    .with_help_message("press Enter without typing anything to cancel")
-        .prompt()
-        .unwrap();
+// impl FactoryApp {
+//     fn run_algorithm(&mut self) {
+//         let mut absent = Vec::new();
+//         let mut training = Vec::new();
+//         let mut loaned = Vec::new();
+//         let mut supervision = Vec::new();
 
-    // Check if the input is empty (indicating the user wants to cancel)
-    if username.trim().is_empty() {
-        println!("Operation canceled.");
-        return Ok(());
-    }
+//         for (operator, status) in &self.statuses {
+//             match status {
+//                 OperatorStatus::Absent => absent.push(operator.clone()),
+//                 OperatorStatus::Training => training.push(operator.clone()),
+//                 OperatorStatus::Loaned => loaned.push(operator.clone()),
+//                 OperatorStatus::Supervision => supervision.push(operator.clone()),
+//                 OperatorStatus::Available => {}
+//             }
+//         }
 
-    // Insert operator into 'users' table with role 'Operator'
-    conn.execute(
-        "INSERT INTO users (username, role) VALUES (?1, 'Operator')",
-        params![username],
-    )?;
+//         // --- MOCK BACKEND LOGIC FOR DEMONSTRATION ---
+//         let mut sorted_assignment = Vec::new();
+//         for op in &self.operators {
+//             if absent.contains(op) {
+//                 sorted_assignment.push((op.clone(), "E".to_string()));
+//             } else if training.contains(op) {
+//                 sorted_assignment.push((op.clone(), "T".to_string()));
+//             } else if loaned.contains(op) {
+//                 sorted_assignment.push((op.clone(), "L".to_string()));
+//             } else if supervision.contains(op) {
+//                 sorted_assignment.push((op.clone(), "S".to_string()));
+//             } else if let Some(forced) = self.forced_assignments.get(op) {
+//                 // Keep forced operation names (e.g., O1) as is, not just 'forced'
+//                 sorted_assignment.push((op.clone(), forced.clone()));
+//             } else {
+//                 // Indicate Team Leader in final output if applicable
+//                 let task = if Some(op) == self.team_leader.as_ref() {
+//                     "TL / Auto Pick".to_string()
+//                 } else {
+//                     "Auto Pick".to_string()
+//                 };
+//                 sorted_assignment.push((op.clone(), task));
+//             }
+//         }
+//         // ---------------------------------------------
 
-    println!("Operator added successfully.");
-    Ok(())
-}
+//         sorted_assignment.sort_by(|(e1, _), (e2, _)| e1.cmp(e2));
 
-fn remove_operator(conn: &Connection) -> Result<()> {
-    // Fetch the list of operators
-    let mut stmt = conn.prepare("SELECT username FROM users WHERE role = 'Operator'")?;
-    let operators = stmt.query_map([], |row| Ok(row.get::<_, String>(0)?))?;
+//         // 4. Update the UI state with results
+//         self.calculated_assignments = Some(sorted_assignment);
+//     }
+// }
 
-    let operator_list: Vec<String> = operators.collect::<Result<Vec<_>, _>>()?;
+impl FactoryApp {
+    fn run_algorithm(&mut self) {
+        // 1. Extract lists for your algorithm based on UI state
+        let mut absent = Vec::new();
+        let mut training = Vec::new();
+        let mut loaned = Vec::new();
+        let mut supervision = Vec::new();
 
-    // If no operators exist, return immediately
-    if operator_list.is_empty() {
-        println!("No operators found.");
-        return Ok(());
-    }
-
-    // Add "Cancel" option to the list of operators
-    let mut operator_list_with_cancel = operator_list.clone();
-    operator_list_with_cancel.push("Cancel".to_string());
-
-    // Select an operator to remove or select "Cancel"
-    let selected_operator = Select::new("Select the Operator to remove (or select 'Cancel' to go back):", operator_list_with_cancel)
-        .prompt()
-        .unwrap();
-
-    // Check if the user selected "Cancel"
-    if selected_operator == "Cancel" {
-        println!("Operation canceled.");
-        return Ok(());
-    }
-
-    // Remove the operator from the 'users' table
-    conn.execute(
-        "DELETE FROM users WHERE username = ?1 AND role = 'Operator'",
-        params![selected_operator],
-    )?;
-
-    println!("Operator removed successfully.");
-    Ok(())
-}
-
-
-// Function to add a new manager
-fn add_manager(conn: &Connection) -> Result<()> {
-    let username = Text::new("Enter new Manager's username:").prompt().unwrap();
-    let password = Password::new("Enter new Manager's password:").prompt().unwrap();
-
-    // Insert new manager into 'users' table with role 'Managing'
-    conn.execute(
-        "INSERT INTO users (username, password, role) VALUES (?1, ?2, 'Managing')",
-        params![username, password],
-    )?;
-
-    println!("Manager added successfully.");
-    Ok(())
-}
-
-// Function to add a new competence
-fn add_competence(conn: &Connection) -> Result<()> {
-    let competence = Text::new("Enter new competence:").prompt().unwrap();
-
-    // Insert new competence into the 'competences' table
-    conn.execute(
-        "INSERT OR IGNORE INTO competences (name) VALUES (?1)",
-        params![competence],
-    )?;
-
-    println!("Competence added successfully.");
-    Ok(())
-}
-
-// Function for an operator to change their job preference
-fn change_job_preference(conn: &Connection, username: &str) -> Result<()> {
-    let new_job = Text::new("Enter your new job preference:").prompt().unwrap();
-
-    // Update the job preference for the operator
-    conn.execute(
-        "UPDATE people SET job = ?1 WHERE name = ?2",
-        params![new_job, username],
-    )?;
-
-    println!("Job preference updated.");
-    Ok(())
-}
-
-// Function to assign competences to an operator
-fn assign_competences_to_operator(conn: &Connection) -> Result<()> {
-    // Fetch the list of operators
-    let mut stmt = conn.prepare("SELECT username FROM users WHERE role = 'Operator'")?;
-    let operators = stmt.query_map([], |row| Ok(row.get::<_, String>(0)?))?;
-
-    let operator_list: Vec<String> = operators.collect::<Result<Vec<_>, _>>()?;
-    if operator_list.is_empty() {
-        println!("No operators found.");
-        return Ok(());
-    }
-
-    // Select an operator
-    let selected_operator = Select::new("Select an operator:", operator_list)
-        .prompt()
-        .unwrap();
-
-    // Fetch the list of competences
-    let mut stmt = conn.prepare("SELECT name FROM competences")?;
-    let competences = stmt.query_map([], |row| Ok(row.get::<_, String>(0)?))?;
-
-    let competence_list: Vec<String> = competences.collect::<Result<Vec<_>, _>>()?;
-    if competence_list.is_empty() {
-        println!("No competences found.");
-        return Ok(());
-    }
-
-    // Use MultiSelect to select competences
-    let selected_competences = MultiSelect::new(
-        "Select competences (use space to select, enter to confirm):",
-        competence_list,
-    )
-    .prompt()
-    .unwrap();
-
-    // Get operator's ID
-    let operator_id: i32 = conn.query_row(
-        "SELECT id FROM users WHERE username = ?1 AND role = 'Operator'",
-        params![selected_operator],
-        |row| row.get(0),
-    )?;
-
-    // Insert selected competences for the operator
-    for competence in selected_competences {
-        let competence_id: i32 = conn.query_row(
-            "SELECT id FROM competences WHERE name = ?1",
-            params![competence],
-            |row| row.get(0),
-        )?;
-
-        conn.execute(
-            "INSERT OR IGNORE INTO person_competences (person_id, competence_id) VALUES (?1, ?2)",
-            params![operator_id, competence_id],
-        )?;
-    }
-
-    println!("Competences assigned to operator successfully.");
-    Ok(())
-}
-
-// Function to display overview of operators and their competences
-fn overview_operators_competences(conn: &Connection) -> Result<()> {
-    // Fetch all operators from the database
-    let mut stmt = conn.prepare("SELECT id, username FROM users WHERE role = 'Operator'")?;
-    let operators = stmt.query_map([], |row| {
-        Ok(Operator {
-            id: row.get(0)?,
-            username: row.get(1)?,
-        })
-    })?;
-
-    let operator_list: Vec<Operator> = operators.collect::<Result<Vec<_>, _>>()?;
-    if operator_list.is_empty() {
-        println!("No operators found.");
-        return Ok(());
-    }
-
-    // Loop through the list of operators and display their competences
-    let operator_usernames: Vec<String> = operator_list.iter().map(|op| op.username.clone()).collect();
-    
-    loop {
-        // Select an operator to view their competences
-        let selected_operator = Select::new("Select an operator to view their competences:", operator_usernames.clone())
-            .prompt()
-            .unwrap();
-
-        // Find the operator in the list and fetch their competences
-        let operator = operator_list.iter().find(|op| op.username == selected_operator).unwrap();
-        let competences = get_competences_for_operator(conn, operator.id)?;
-
-        // Display the competences in a tree-like format
-        println!("Operator: {}", operator.username);
-        if competences.is_empty() {
-            println!("  No competences assigned.");
-        } else {
-            println!("  Competences:");
-            for competence in competences {
-                println!("    - {}", competence);
+        for (operator, status) in &self.statuses {
+            match status {
+                OperatorStatus::Absent => absent.push(operator.clone()),
+                OperatorStatus::Training => training.push(operator.clone()),
+                OperatorStatus::Loaned => loaned.push(operator.clone()),
+                OperatorStatus::Supervision => supervision.push(operator.clone()),
+                OperatorStatus::Available => {}
             }
         }
 
-        // Ask if the managing user wants to view another operator's competences
-        let view_another = Select::new("Do you want to view another operator's competences?", vec!["Yes", "No"])
-            .prompt()
-            .unwrap();
+        // 2. Format forced assignments into tuples
+        let forced_assignments_vec: Vec<(String, String)> = self.forced_assignments
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
 
-        if view_another == "No" {
-            break;
+        // 3. Load Data Files (Matrix and History)
+        // Note: For a production GUI, you might want to load these once in `FactoryApp::default()` 
+        // to avoid reading from the disk on every button click, but this matches your test structure.
+        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+        
+        let matrix_path = format!("{}/data/factory/GTO_matrix.json", manifest_dir);
+        let matrix_content = std::fs::read_to_string(matrix_path).expect("Failed to read matrix.json");
+        let matrix: artwork_ejas::Matrix = serde_json::from_str(&matrix_content).expect("Failed to parse matrix JSON");
+
+        let history_path = format!("{}/data/factory/GTO_nov_history.json", manifest_dir);
+        let history_content = std::fs::read_to_string(history_path).expect("Failed to read history JSON");
+        let history_wrapper: Vec<PassWrapper> = serde_json::from_str(&history_content).expect("Failed to parse history");
+        let full_passes: Vec<Pass> = history_wrapper.into_iter().map(|pw| pw.pass).collect();
+
+        // 4. Algorithm Parameters
+        let offset = 2000;
+        let omega = 1;
+        let alpha = 192;
+        let beta = 384;
+        let tau: usize = 8;
+        let gamma = 24;
+        let station_id = "GTO"; 
+
+        let station_data = matrix.stations.get(station_id).expect("Station GTO not found in matrix");
+
+        // Use the team leader from the UI state (falling back to empty string if none selected)
+        let leader_name = self.team_leader.clone().unwrap_or_default();
+
+        // 5. Slice the history window (Take the last `tau` days from the loaded history)
+        let start_idx = if full_passes.len() > tau { full_passes.len() - tau } else { 0 };
+        let history_window_passes = full_passes[start_idx..].to_vec();
+
+        let history_window_days: Vec<Day> = history_window_passes.iter().map(|p| {
+            Day {
+                date: p.date.clone(), 
+                station: p.station.clone(),
+                leader: leader_name.clone(), 
+                assignments: p.assignments.clone(), 
+            }
+        }).collect();
+
+        // 6. Run the algorithm
+        let s = calculate_ergonomic_assignment(
+            station_data,
+            history_window_days,
+            offset,
+            omega,
+            alpha,
+            beta,
+            tau as u32,
+            gamma,
+            &forced_assignments_vec,
+            &loaned,
+            &absent,
+            &training,
+            &supervision // Passed via your backend signature
+        );
+
+        // 7. Reconstruct the full assignment for the UI
+        let mut sorted_assignment = s.internal_assignments.to_vec();
+        
+        loaned.iter().for_each(|x| sorted_assignment.push((x.to_string(), "L".to_string())));
+        absent.iter().for_each(|x| sorted_assignment.push((x.to_string(), "E".to_string())));
+        training.iter().for_each(|x| sorted_assignment.push((x.to_string(), "T".to_string())));
+        supervision.iter().for_each(|x| sorted_assignment.push((x.to_string(), "S".to_string())));
+        
+        // Automatically assign the "TL" task if the leader is present and unassigned
+        if !leader_name.is_empty() {
+            let is_absent = absent.contains(&leader_name);
+            let is_training = training.contains(&leader_name);
+            let is_loaned = loaned.contains(&leader_name);
+            let is_supervision = supervision.contains(&leader_name);
+            let is_on_operation = s.internal_assignments.iter().any(|(emp, _)| emp == &leader_name);
+
+            if !is_absent && !is_training && !is_loaned && !is_supervision && !is_on_operation {
+                sorted_assignment.push((leader_name.clone(), "TL".to_string()));
+            }
         }
+
+        // 8. Sort alphabetically and update the UI state
+        sorted_assignment.sort_by(|(e1, _), (e2, _)| e1.cmp(e2));
+        self.calculated_assignments = Some(sorted_assignment);
     }
-
-    Ok(())
 }
 
-// Helper function to get competences for a specific operator
-fn get_competences_for_operator(conn: &Connection, operator_id: i32) -> Result<Vec<String>> {
-    let mut stmt = conn.prepare(
-        "SELECT competences.name
-         FROM competences
-         JOIN person_competences ON competences.id = person_competences.competence_id
-         WHERE person_competences.person_id = ?1"
-    )?;
+fn main() -> eframe::Result<()> {
+    // Increased window size to accommodate larger elements and side-by-side layout
+    let mut native_options = eframe::NativeOptions::default();
+    native_options.viewport.inner_size = Some(egui::vec2(900.0, 700.0));
+    native_options.viewport.min_inner_size = Some(egui::vec2(600.0, 400.0));
 
-    let competences = stmt.query_map(params![operator_id], |row| Ok(row.get::<_, String>(0)?))?;
-
-    competences.collect::<Result<Vec<_>, _>>()
-}
-
-// Struct to represent an operator
-struct Operator {
-    id: i32,
-    username: String,
+    eframe::run_native(
+        "Ergonomic Assigner v2",
+        native_options,
+        Box::new(|_cc| Box::<FactoryApp>::default()),
+    )
 }

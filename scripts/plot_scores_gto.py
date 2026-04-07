@@ -35,8 +35,8 @@ def load_evaluation_data(filepath):
     return dates, scores
 
 def plot_quality_scores(dates, scores_manual, scores_initial, scores_rolling):
-    # Dynamic sizing based on timeline length
-    fig, ax = plt.subplots(figsize=(max(12, len(dates) * 0.25), 6))
+    # Dynamic sizing based on timeline length - increased base size for larger fonts
+    fig, ax = plt.subplots(figsize=(max(16, len(dates) * 0.35), 8))
 
     # Color palette requested
     colors = {
@@ -48,12 +48,16 @@ def plot_quality_scores(dates, scores_manual, scores_initial, scores_rolling):
     # Use a categorical integer index to ensure perfectly equal spacing between points
     x_indices = np.arange(len(dates))
 
-    # Plot the lines (matplotlib automatically breaks lines at np.nan)
-    ax.plot(x_indices, scores_manual, color=colors["manual"], linewidth=2.5, marker='o', markersize=5, zorder=3, label="Manual")
-    ax.plot(x_indices, scores_initial, color=colors["initial"], linewidth=2.5, marker='o', markersize=5, zorder=3, label="Initial (Open-Loop)")
-    ax.plot(x_indices, scores_rolling, color=colors["rolling"], linewidth=2.5, marker='o', markersize=5, zorder=3, label="Rolling (Closed-Loop)")
+    # --- SLIGHTLY INCREASED LINE WIDTH ---
+    line_w = 5
+    marker_s = 7
 
-    # Add small numbers by each dot. 
+    # Plot the lines (matplotlib automatically breaks lines at np.nan)
+    ax.plot(x_indices, scores_manual, color=colors["manual"], linewidth=line_w, marker='o', markersize=marker_s, zorder=3, label="Manual")
+    ax.plot(x_indices, scores_initial, color=colors["initial"], linewidth=line_w, marker='o', markersize=marker_s, zorder=3, label="Initial (Open-Loop)")
+    ax.plot(x_indices, scores_rolling, color=colors["rolling"], linewidth=line_w, marker='o', markersize=marker_s, zorder=3, label="Rolling (Closed-Loop)")
+
+    # --- ADDED BACK THE NUMBERS BY THE DOTS ---
     for scores_list, color in [(scores_manual, colors["manual"]), 
                                (scores_initial, colors["initial"]), 
                                (scores_rolling, colors["rolling"])]:
@@ -62,14 +66,15 @@ def plot_quality_scores(dates, scores_manual, scores_initial, scores_rolling):
             if np.isnan(y):
                 continue
                 
-            ax.annotate(f"{y:.0f}", 
-                        (x, y), 
-                        textcoords="offset points", 
-                        xytext=(0, 8), 
-                        ha='center', 
-                        fontsize=8,
-                        color=color,
-                        zorder=4)
+            # ax.annotate(f"{y:.0f}", 
+            #             (x, y), 
+            #             textcoords="offset points", 
+            #             xytext=(0, 8), 
+            #             ha='center', 
+            #             fontsize=12,
+            #             fontweight='bold',
+            #             color=color,
+            #             zorder=4)
 
     # Clean up the axes by removing the outer box
     for spine in ax.spines.values():
@@ -80,8 +85,8 @@ def plot_quality_scores(dates, scores_manual, scores_initial, scores_rolling):
     ax.set_axisbelow(True)
     ax.tick_params(which="both", bottom=False, left=False)
 
-    # Labels and Titles
-    ax.set_ylabel("Daily Quality Score (DQS)", labelpad=15, fontsize=13)
+    # Y-LABEL
+    ax.set_ylabel("Assignment Quality Score", labelpad=15, fontsize=24)
     
     # Format X-axis to show DD.MM. periodically
     tick_spacing = max(1, len(dates) // 15)
@@ -89,27 +94,31 @@ def plot_quality_scores(dates, scores_manual, scores_initial, scores_rolling):
     labels_to_show = [dates[i].strftime("%d.%m.") for i in ticks_to_show]
     
     ax.set_xticks(ticks_to_show)
-    ax.set_xticklabels(labels_to_show, fontsize=11)
     
-    plt.yticks(fontsize=11)
-    plt.xticks(fontsize=11, rotation=45)
+    # INCREASED TICK SIZES
+    ax.set_xticklabels(labels_to_show, fontsize=24, rotation=45)
+    ax.tick_params(axis='y', labelsize=24)
 
-    ax.set_title("Evaluation of Assignment Quality Over Time", fontsize=16, pad=25)
+    # --- REMOVED BOLD FROM MAIN TITLE ---
+    fig.suptitle("Volvo GTO Assignment Quality Evaluation for November 2025", fontsize=38, y=0.99)
     
-    ax.legend(loc="upper right", frameon=False, fontsize=11)
+    # --- REDUCED GAP BETWEEN LEGEND AND PLOT ---
+    # Legend is positioned at 0.955, and the plot canvas reaches up to 0.945 to make them very close
+    handles, labels = ax.get_legend_handles_labels()
+    fig.legend(handles, labels, loc='upper center', ncol=3, frameon=False, fontsize=24, bbox_to_anchor=(0.5, 0.955))
 
-    plt.tight_layout(rect=[0, 0.05, 1, 0.95])
-    plt.savefig("assignment_quality_evaluation_tau_8.pdf", bbox_inches="tight")
+    plt.tight_layout(rect=[0, 0, 1, 0.945])
+    plt.savefig("assignment_quality_evaluation_november_tau_8.pdf", bbox_inches="tight")
     plt.show()
 
 if __name__ == "__main__":
-    # path_manual = "/home/endre/rust_ws/artwork_ejas/data/factory/evaluation/GTO/GTO_january_manual_tau_8.json"
-    # path_initial = "/home/endre/rust_ws/artwork_ejas/data/factory/evaluation/GTO/GTO_january_initial_tau_8.json"
-    # path_rolling = "/home/endre/rust_ws/artwork_ejas/data/factory/evaluation/GTO/GTO_january_rolling_tau_8.json"
-
     path_manual = "/home/endre/rust_ws/artwork_ejas/data/factory/evaluation/GTO/GTO_november_manual_tau_8.json"
     path_initial = "/home/endre/rust_ws/artwork_ejas/data/factory/evaluation/GTO/GTO_november_initial_tau_8.json"
     path_rolling = "/home/endre/rust_ws/artwork_ejas/data/factory/evaluation/GTO/GTO_november_rolling_tau_8.json"
+
+    # path_manual = "/home/endre/rust_ws/artwork_ejas/data/factory/evaluation/GTO/GTO_january_manual_tau_8.json"
+    # path_initial = "/home/endre/rust_ws/artwork_ejas/data/factory/evaluation/GTO/GTO_january_initial_tau_8.json"
+    # path_rolling = "/home/endre/rust_ws/artwork_ejas/data/factory/evaluation/GTO/GTO_january_rolling_tau_8.json"
 
     # 1. Load data
     dates_m, scores_manual = load_evaluation_data(path_manual)

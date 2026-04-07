@@ -233,7 +233,7 @@ def plot_all_parts(files, output_filename="four_part_evaluation.pdf"):
         
         # --- INCREASED Y-LABEL SIZE ---
         if i % 2 == 0:
-            axs[i].set_ylabel("Daily Quality Score (DQS)", labelpad=15, fontsize=18)
+            axs[i].set_ylabel("Assignment Quality Score", labelpad=15, fontsize=18)
 
     # Extract handles and labels from the first subplot to create a single, unified legend
     handles, labels = axs[0].get_legend_handles_labels()

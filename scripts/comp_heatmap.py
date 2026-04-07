@@ -87,11 +87,11 @@ def plot_station_heatmap(station_name, station_data):
     # Ticks and labels
     ax.set_xticks(np.arange(len(operators)))
     ax.set_yticks(np.arange(len(operations)))
-    ax.set_xticklabels(operators, ha='center', fontsize=9)
-    ax.set_yticklabels(operations, fontsize=9)
+    ax.set_xticklabels(operators, ha='center', fontsize=13)
+    ax.set_yticklabels(operations, fontsize=13)
 
-    ax.set_xlabel("Operators", labelpad=10, fontsize=11)
-    ax.set_ylabel("Operations", labelpad=10, fontsize=11)
+    ax.set_xlabel("Operators", labelpad=10, fontsize=13)
+    ax.set_ylabel("Operations", labelpad=10, fontsize=13)
 
     # Remove outer black box (spines)
     for spine in ax.spines.values():
@@ -122,7 +122,7 @@ def plot_station_heatmap(station_name, station_data):
     cbar.set_ticks([0, 1])
     cbar.set_ticklabels(["No/Low Pref", "Top Pref"])
 
-    plt.title(f"Volvo {station_name} station", fontsize=15, pad=15)
+    plt.title(f"Volvo {station_name} station Competences and Preferences", fontsize=16, pad=18)
     plt.tight_layout()
     plt.show()
 
