@@ -86,7 +86,7 @@
 #     fig, axs = plt.subplots(2, 2, figsize=(18, 10))
 #     axs = axs.flatten() # Flatten the 2x2 array to easily iterate 0 to 3
 
-#     titles = ["16.01. - 13.01.", "02.02. - 06.02.", "11.02. - 17.02.", "27.02. - 10.03."]
+#     titles = ["16.01. - 23.01.", "02.02. - 06.02.", "11.02. - 17.02.", "27.02. - 10.03."]
 
 #     for i, filepath in enumerate(files):
 #         # Load the data for this specific part
@@ -179,20 +179,20 @@ def plot_subplot(ax, dates, scores_manual, scores_initial, scores_rolling, title
     ax.plot(x_indices, scores_rolling, color=colors["rolling"], linewidth=line_w, marker='o', markersize=marker_s, zorder=3, label="Rolling (Closed-Loop)")
 
     # Add numbers by each dot
-    for scores_list, color in [(scores_manual, colors["manual"]), 
-                               (scores_initial, colors["initial"]), 
-                               (scores_rolling, colors["rolling"])]:
-        for x, y in zip(x_indices, scores_list):
-            # INCREASED ANNOTATION FONT SIZE AND PUSHED IT HIGHER (xytext) TO CLEAR THICK LINES
-            ax.annotate(f"{y:.0f}", 
-                        (x, y), 
-                        textcoords="offset points", 
-                        xytext=(0, 12), 
-                        ha='center', 
-                        fontsize=12,
-                        fontweight='bold',
-                        color=color,
-                        zorder=4)
+    # for scores_list, color in [(scores_manual, colors["manual"]), 
+    #                            (scores_initial, colors["initial"]), 
+    #                            (scores_rolling, colors["rolling"])]:
+    #     for x, y in zip(x_indices, scores_list):
+    #         # INCREASED ANNOTATION FONT SIZE AND PUSHED IT HIGHER (xytext) TO CLEAR THICK LINES
+    #         ax.annotate(f"{y:.0f}", 
+    #                     (x, y), 
+    #                     textcoords="offset points", 
+    #                     xytext=(0, 12), 
+    #                     ha='center', 
+    #                     fontsize=12,
+    #                     fontweight='bold',
+    #                     color=color,
+    #                     zorder=4)
 
     # Clean up the axes by removing the outer box
     for spine in ax.spines.values():
@@ -222,7 +222,7 @@ def plot_all_parts(files, output_filename="four_part_evaluation.pdf"):
     fig, axs = plt.subplots(2, 2, figsize=(20, 12))
     axs = axs.flatten() 
 
-    titles = ["16.01. - 13.01.", "02.02. - 06.02.", "11.02. - 17.02.", "27.02. - 10.03."]
+    titles = ["16.01. - 23.01.", "02.02. - 06.02.", "11.02. - 17.02.", "27.02. - 10.03."]
 
     for i, filepath in enumerate(files):
         # Load the data for this specific part
