@@ -1,0 +1,11 @@
+[build]
+target = "crates/ejas-ui/index.html"
+dist = "crates/ejas-server/dist"
+
+[serve]
+# Proxy the API to a locally running ejas-server so `trunk serve` gives the
+# same same-origin setup the packaged app has.
+port = 8081
+
+[[proxy]]
+backend = "http://127.0.0.1:8080/api"

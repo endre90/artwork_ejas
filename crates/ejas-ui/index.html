@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <title>Ergonomic Assigner</title>
+    <link data-trunk rel="rust" data-target-name="ejas_ui" data-type="main" data-wasm-opt="z" />
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #1b1b1f;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      #loading {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: ui-sans-serif, system-ui, sans-serif;
+        color: #d0d0d8;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="app_canvas"></canvas>
+    <div id="loading"><p>Loading the Ergonomic Assigner…</p></div>
+  </body>
+</html>

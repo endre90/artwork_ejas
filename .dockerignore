@@ -1,0 +1,9 @@
+# The build tree is gigabytes and would be sent to the daemon every build.
+target/
+**/target/
+# Built frontend: the image builds its own inside the frontend stage.
+crates/ejas-server/dist/
+.git/
+figures/
+scripts/
+*.pdf

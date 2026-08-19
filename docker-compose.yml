@@ -1,0 +1,8 @@
+services:
+  ejas:
+    build: .
+    # Bound to loopback: this is a single-user local tool, with no auth.
+    # Change to "8080:8080" only if you intend it reachable on the network.
+    ports:
+      - "127.0.0.1:8080:8080"
+    restart: unless-stopped

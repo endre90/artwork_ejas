@@ -1,1 +1,4 @@
 /target
+# Built WebAssembly bundle: produced by `trunk build` and embedded at compile
+# time. The directory itself is recreated by crates/ejas-server/build.rs.
+/crates/ejas-server/dist/

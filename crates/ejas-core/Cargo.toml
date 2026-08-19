@@ -1,0 +1,8 @@
+[package]
+name = "ejas-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+serde = { workspace = true }

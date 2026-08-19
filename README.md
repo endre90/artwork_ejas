@@ -3,21 +3,163 @@
 The problem is to assign $N$ employees to $M$ jobs, taking into account competences and preferences.
 
 ## Quickstart
-1. Install Rust: https://www.rust-lang.org/tools/install
-2. Install Z3: https://github.com/Z3Prover/z3
-3. Clone this repository
+
+The app runs in your browser: an egui/eframe interface compiled to WebAssembly,
+served by a small Rust server that runs the Z3 solver. Z3 is C++ and cannot be
+compiled to WebAssembly, which is why the solving happens server-side.
+
+### Run with Docker (recommended)
+
+No Rust, no Z3, no toolchain — just Docker.
+
 ```
 git clone https://github.com/endre90/artwork_ejas.git
-```
-4. Build code:
-```
 cd artwork_ejas
-cargo build
+docker compose up
 ```
-5. Run an example, for instance:
+
+Then open <http://localhost:8080>.
+
+- Stop it with `Ctrl-C`, or `docker compose down`.
+- After pulling new changes: `docker compose up --build`.
+- The port is set in `docker-compose.yml`. It is published as
+  `127.0.0.1:8080:8080`, so the app is reachable only from this machine —
+  there is no authentication, so do not expose it to a network without
+  putting something in front of it.
+
+**On the build time.** The first build takes a few minutes and is dominated by
+compiling Rust dependencies. Z3 itself is *not* compiled: the image installs
+the distro's prebuilt `libz3-dev` package (about 8 MB, a few seconds). The `z3`
+crate is declared without the `bundled` / `static-link-z3` feature, so it links
+dynamically against that system library. If you have ever waited an hour for Z3
+to build from source, that is the feature you want to keep switched off.
+Rebuilds after the first are cached and take well under a minute.
+
+### Run natively (for development)
+
+**Prerequisites**
+
+1. Rust 1.96 or newer: <https://www.rust-lang.org/tools/install>
+2. Z3 **from your package manager, not from source**:
+   - Debian/Ubuntu: `sudo apt install libz3-dev libclang-dev`
+   - macOS: `brew install z3`
+   - Fedora: `sudo dnf install z3-devel clang-devel`
+
+   The `-dev` package matters: `z3-sys` needs both `libz3.so` *and* the `z3.h`
+   headers, because it regenerates its FFI bindings with bindgen at build time
+   (which is also why `libclang` is required). If Z3 lives somewhere
+   non-standard, point the build at it with
+   `export Z3_SYS_Z3_HEADER=/your/prefix/include/z3.h`.
+
+**Running**
+
+Two terminals:
+
 ```
-TODO
+cargo run -p ejas-server          # the solver, on :8080
+cargo run -p ejas-ui              # the same UI, as a desktop window
 ```
+
+The desktop build talks to the same HTTP API as the browser build, so there is
+one UI codebase rather than two. It reads `EJAS_SERVER` for the server address
+and defaults to `http://127.0.0.1:8080`.
+
+To work on the web build itself, use [trunk](https://trunkrs.dev):
+
+```
+cargo install --locked trunk
+trunk build --release             # writes crates/ejas-server/dist/
+cargo run -p ejas-server          # serves that bundle at :8080
+```
+
+`trunk serve` also works for live reload; it proxies `/api` to a server you
+start separately on :8080.
+
+**Tests**
+
+```
+cargo test -p ejas-server         # weight presets behave as advertised
+cargo test -p artwork_ejas        # the solver's own evaluation harnesses
+```
+
+## Usage
+
+### Getting your data in
+
+Three ways, offered on the first screen:
+
+- **Load a matrix file** — a JSON file describing the station. You can also
+  drag it onto the window.
+- **Set up from scratch** — define the jobs, then add employees with their
+  competences and preferences. Export the result as a matrix file to reuse it
+  tomorrow.
+- **Try an example** — the anonymised VCE and GTO rosters bundled with the
+  repository.
+
+Optionally load an **assignment history** as well. History is what the fairness
+term works on: without it the solver has no way to know who did what yesterday,
+and cannot rotate work. Both the day-based (`{"day": ...}`) and pass-based
+(`{"pass": ...}`) file formats are accepted.
+
+### Matrix file format
+
+```json
+{
+  "stations": {
+    "CE": {
+      "ergo_score": { "O1": 1, "O2": 3 },
+      "people": [
+        {
+          "name": "A",
+          "role": "Operator",
+          "competences": ["O1", "O2"],
+          "preferences": ["O2"]
+        },
+        {
+          "name": "B",
+          "role": "TeamLeader",
+          "competences": ["O1"],
+          "preferences": []
+        }
+      ]
+    }
+  }
+}
+```
+
+- `ergo_score` maps each job to how physically demanding it is; its keys define
+  the station's job list.
+- `preferences` is **ordered**: position in the list is the preference rank, so
+  the first entry is the most wanted job.
+- Exactly one person must have `"role": "TeamLeader"`.
+- `data/factory/VCE_matrix.json` and `data/factory/GTO_matrix.json` are working
+  examples.
+
+### Weights
+
+The objective is
+
+```
+offset + omega * preference - alpha * leader - beta * external - gamma * historical
+```
+
+Rather than tuning six numbers, pick a preset — or choose **Manual** and edit
+every weight yourself. Manual starts from whichever preset you had selected, so
+you tune from a working baseline.
+
+| Preset | offset | omega | alpha | beta | tau | gamma | What it does |
+|---|---|---|---|---|---|---|---|
+| **Balanced** | 2000 | 1 | 192 | 384 | 8 | 24 | The long-standing default weights |
+| **Preference-first** | 2000 | **8** | 192 | 384 | 8 | 24 | Accepts a few repeats to give people the jobs they asked for |
+| **Fairness-first** | 2000 | 1 | 192 | 384 | 8 | **96** | Avoids repeating recent person-job pairings, even if the team leader has to take a job |
+
+Each preset changes exactly one weight from Balanced, and each is checked
+against the bundled data by `cargo test -p ejas-server`: Preference-first
+raises VCE's preference reward from 85 to 96, and Fairness-first drops GTO's
+repeat count from 2 to 0. `tau` deliberately stays at 8 in every preset —
+widening the history window counts *more* past assignments and so raises the
+repeat count, which would make a fairness preset look like it backfired.
+
 ## Background
 
 The remaining text shows the development steps of the EJAS for Artwork.

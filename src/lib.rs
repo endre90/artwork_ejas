@@ -1,6 +1,9 @@
 pub mod core;
 pub use crate::core::structs::*;
 
+// Wire types live in `ejas-core` so the WebAssembly UI can share them.
+pub use ejas_core::api::*;
+
 pub mod utils;
 pub use utils::loading::*; 
 pub use utils::errors::*; 

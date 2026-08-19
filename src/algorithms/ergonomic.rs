@@ -29,10 +29,53 @@ pub struct ErgonomicAssignmentSolution {
     pub p_matrix: Vec<Vec<usize>>, // preference matrix passed back
     pub h_matrix: Vec<Vec<u32>>,   // historic matrix passed back
     pub solving_time: Duration,    // how long the solver took
-    pub offset: u32
+    pub offset: u32,
+    /// Whether the solver actually found an assignment. Without this an
+    /// Unsat/Unknown result is indistinguishable from a real zero score.
+    pub status: SolveStatus,
 }
 
+/// Original entry point, kept so the evaluation harnesses in this file keep
+/// their exact signature and output. Runs without a solver time limit.
 pub fn calculate_ergonomic_assignment(
+    station: &Station,
+    history: Vec<Day>,
+    offset: u32,
+    omega: u32,
+    alpha: u32,
+    beta: u32,
+    tau: u32,
+    gamma: u32,
+    forced_assignments: &[(String, String)],
+    loaned_employees: &[String],
+    absent_employees: &[String],
+    special_training_employees: &[String],
+    supervision: &[String],
+) -> ErgonomicAssignmentSolution {
+    calculate_ergonomic_assignment_with_timeout(
+        station,
+        history,
+        offset,
+        omega,
+        alpha,
+        beta,
+        tau,
+        gamma,
+        forced_assignments,
+        loaned_employees,
+        absent_employees,
+        special_training_employees,
+        supervision,
+        None,
+    )
+}
+
+/// As [`calculate_ergonomic_assignment`], but with a wall-clock budget.
+///
+/// A server must not let one pathological roster occupy a worker forever;
+/// on expiry Z3 returns `Unknown`, which now surfaces as [`SolveStatus::Unknown`]
+/// rather than looking like a zero-scored solution.
+pub fn calculate_ergonomic_assignment_with_timeout(
     station: &Station,
     history: Vec<Day>,
     offset: u32, // Add to objective to get a positive integer result (just for aesthetics)
@@ -47,7 +90,8 @@ pub fn calculate_ergonomic_assignment(
     loaned_employees: &[String],
     absent_employees: &[String],
     special_training_employees: &[String],
-    supervision: &[String]
+    supervision: &[String],
+    timeout_ms: Option<u32>,
 ) -> ErgonomicAssignmentSolution {
     let mut jobs = vec![];
     let mut employees = vec![];
@@ -77,9 +121,11 @@ pub fn calculate_ergonomic_assignment(
     let ctx = Context::new(&cfg);
     let optimizer = Optimize::new(&ctx);
 
-    // let mut params = z3::Params::new(&ctx);
-    // params.set_u32("timeout", 60000); // 5000 milliseconds = 5 seconds
-    // optimizer.set_params(&params);
+    if let Some(timeout_ms) = timeout_ms {
+        let mut params = z3::Params::new(&ctx);
+        params.set_u32("timeout", timeout_ms);
+        optimizer.set_params(&params);
+    }
 
     // We define x_ij as a boolean variable indicating whether employee i
     // is assigned to job j, i.e. x_ij ∈ {true, false}.
@@ -719,7 +765,8 @@ pub fn calculate_ergonomic_assignment(
                 p_matrix,
                 h_matrix,
                 solving_time,
-                offset
+                offset,
+                status: SolveStatus::Sat,
             }
         }
         SatResult::Unsat => {
@@ -744,7 +791,8 @@ pub fn calculate_ergonomic_assignment(
                 p_matrix,
                 h_matrix,
                 solving_time,
-                offset
+                offset,
+                status: SolveStatus::Unsat,
             }
         }
         _ => {
@@ -769,7 +817,8 @@ pub fn calculate_ergonomic_assignment(
                 p_matrix,
                 h_matrix,
                 solving_time,
-                offset
+                offset,
+                status: SolveStatus::Unknown,
             }
         }
     }
@@ -790,7 +839,7 @@ mod tests {
         // let path = format!("{}/data/synthetic/{}_matrix_static.json", manifest_dir, s);
         let path = format!("{}/data/factory/VCE_matrix.json", manifest_dir);
 
-        let history_path = format!("{}/data/factory/VCE_algo_strat_1_rolling_part_a.json", manifest_dir);
+        let history_path = format!("{}/data/factory/VCE_history.json", manifest_dir);
         // let history_path = format!("{}/data/factory/VCE_history_part_a.json", manifest_dir);
         let history_content = fs::read_to_string(history_path)?;
         let history_wrapper: Vec<DayWrapper> = serde_json::from_str(&history_content)?;
