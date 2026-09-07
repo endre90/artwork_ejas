@@ -1,6 +1,7 @@
 //! Screen 3: today's statuses and weights, the solve, and the result.
 
-use ejas_core::api::{SolveStatus, WeightPreset};
+use ejas_core::api::{SolveStatus, StationDims, WeightPreset};
+use ejas_core::validate;
 
 use crate::app::EjasApp;
 use crate::fileio;
@@ -13,7 +14,12 @@ pub fn show(app: &mut EjasApp, ui: &mut egui::Ui) {
         .show(ui, |ui| {
             egui::ScrollArea::vertical()
                 .id_salt("operators_scroll")
-                .show(ui, |ui| operators(app, ui));
+                .show(ui, |ui| {
+                    leader(app, ui);
+                    ui.add_space(8.0);
+                    ui.separator();
+                    operators(app, ui);
+                });
         });
 
     egui::CentralPanel::default().show(ui, |ui| {
@@ -28,6 +34,55 @@ pub fn show(app: &mut EjasApp, ui: &mut egui::Ui) {
                 results(app, ui);
             });
     });
+}
+
+/// Today's team leader.
+///
+/// This is the only place it is set. Leaders rotate, so it belongs to the day
+/// rather than to the roster, and the server takes this over whatever role the
+/// loaded matrix file happens to carry.
+fn leader(app: &mut EjasApp, ui: &mut egui::Ui) {
+    super::section(ui, "Team leader today", |ui| {
+        ui.label(
+            egui::RichText::new(
+                "Leaders rotate, so this is chosen per day rather than on the roster.",
+            )
+            .weak(),
+        );
+    });
+    ui.add_space(6.0);
+
+    let names: Vec<String> = app
+        .problem
+        .station
+        .people
+        .iter()
+        .map(|e| e.name.clone())
+        .collect();
+
+    let mut selected = app.daily.team_leader.clone();
+    egui::ComboBox::from_id_salt("todays_leader")
+        .selected_text(selected.clone().unwrap_or_else(|| "— choose —".to_owned()))
+        .width(220.0)
+        .show_ui(ui, |ui| {
+            ui.selectable_value(&mut selected, None, "— nobody —");
+            for name in &names {
+                ui.selectable_value(&mut selected, Some(name.clone()), name);
+            }
+        });
+    if selected != app.daily.team_leader {
+        app.daily.team_leader = selected;
+        app.outcome = None;
+    }
+
+    // The same check that gates the solve button, shown where it is fixable.
+    for problem in validate::validate_leader(&app.problem.station, app.daily.team_leader.as_deref())
+    {
+        ui.colored_label(
+            ui.visuals().error_fg_color,
+            format!("⚠ {}", problem.message()),
+        );
+    }
 }
 
 fn operators(app: &mut EjasApp, ui: &mut egui::Ui) {
@@ -60,7 +115,7 @@ fn operators(app: &mut EjasApp, ui: &mut egui::Ui) {
                     let is_leader = app.daily.team_leader.as_deref() == Some(name.as_str());
                     if ui
                         .selectable_label(is_leader, "TL")
-                        .on_hover_text("Team leader today")
+                        .on_hover_text("Make this person today's team leader")
                         .clicked()
                     {
                         app.daily.team_leader =
@@ -170,7 +225,8 @@ fn weights(app: &mut EjasApp, ui: &mut egui::Ui) {
                 .on_hover_text("Set every weight yourself.")
                 .clicked()
             {
-                app.weights.switch_to_manual();
+                let station = app.problem.station.clone();
+                app.weights.switch_to_manual(&station);
                 app.outcome = None;
             }
         });
@@ -184,17 +240,46 @@ fn weights(app: &mut EjasApp, ui: &mut egui::Ui) {
             ui.add_space(4.0);
             // Show the numbers even for a preset: a label alone does not tell
             // anyone what the solver is actually going to do.
-            let p = preset.params();
+            let dims = StationDims::of(&app.problem.station);
+            let p = preset.params(dims, app.weights.inputs);
             egui::Grid::new("preset_values")
                 .num_columns(2)
                 .spacing([18.0, 4.0])
                 .show(ui, |ui| {
                     for (label, value) in rows(&p) {
                         ui.label(egui::RichText::new(label).weak());
-                        ui.label(value.to_string());
+                        ui.label(value);
                         ui.end_row();
                     }
                 });
+            ui.add_space(6.0);
+            // The weights are computed, not chosen, so show what they were
+            // computed from - otherwise the numbers above look arbitrary.
+            ui.label(
+                egui::RichText::new(format!(
+                    "derived from N={} operators, M={} jobs, ergonomic scores {}..{}",
+                    dims.n, dims.m, dims.e_min, dims.e_max
+                ))
+                .weak(),
+            );
+            ui.add_space(4.0);
+            let mut inputs = app.weights.inputs;
+            let mut changed = false;
+            egui::Grid::new("preset_inputs")
+                .num_columns(3)
+                .spacing([14.0, 6.0])
+                .show(ui, |ui| {
+                    changed |= drag(ui, "dₗᵢₘ  rotate after", &mut inputs.d_limit, 1..=60,
+                        "Consecutive days on one job after which rotating off it becomes mandatory.");
+                    changed |= drag(ui, "K  external ÷ leader", &mut inputs.k, 1..=100,
+                        "How many times more undesirable an external operator is than using the team leader. Sets β = K × α.");
+                    changed |= drag(ui, "τ  history days", &mut inputs.tau, 1..=365,
+                        "How many recent days the fairness term looks back over.");
+                });
+            if changed {
+                app.weights.inputs = inputs;
+                app.outcome = None;
+            }
         }
         WeightMode::Manual => {
             let p = &mut app.weights.manual;
@@ -203,19 +288,60 @@ fn weights(app: &mut EjasApp, ui: &mut egui::Ui) {
                 .num_columns(3)
                 .spacing([14.0, 6.0])
                 .show(ui, |ui| {
-                    changed |= drag(ui, "offset", &mut p.offset, 0..=100_000,
-                        "Added to the score so it reads as a positive number.");
-                    changed |= drag(ui, "ω  preference", &mut p.omega, 0..=1000,
-                        "Reward for giving someone a job they asked for.");
-                    changed |= drag(ui, "α  leader", &mut p.alpha, 0..=10_000,
-                        "Penalty for putting the team leader on a job.");
-                    changed |= drag(ui, "β  external", &mut p.beta, 0..=10_000,
-                        "Penalty for needing an operator from outside the station.");
-                    changed |= drag(ui, "τ  history days", &mut p.tau, 0..=365,
-                        "How many recent days the fairness term looks back over.");
-                    changed |= drag(ui, "γ  repetition", &mut p.gamma, 0..=10_000,
-                        "Penalty for repeating a recent person-job pairing.");
+                    changed |= drag(
+                        ui,
+                        "offset",
+                        &mut p.offset,
+                        0..=100_000,
+                        "Added to the score so it reads as a positive number.",
+                    );
+                    changed |= drag(
+                        ui,
+                        "ω  preference",
+                        &mut p.omega,
+                        0..=1000,
+                        "Reward for giving someone a job they asked for.",
+                    );
+                    changed |= drag(
+                        ui,
+                        "α  leader",
+                        &mut p.alpha,
+                        0..=10_000,
+                        "Penalty for putting the team leader on a job.",
+                    );
+                    changed |= drag(
+                        ui,
+                        "β  external",
+                        &mut p.beta,
+                        0..=10_000,
+                        "Penalty for needing an operator from outside the station.",
+                    );
+                    changed |= drag(
+                        ui,
+                        "τ  history days",
+                        &mut p.tau,
+                        0..=365,
+                        "How many recent days the fairness term looks back over.",
+                    );
+                    changed |= drag(
+                        ui,
+                        "γ  repetition",
+                        &mut p.gamma,
+                        0..=10_000,
+                        "Penalty for repeating a recent person-job pairing.",
+                    );
                 });
+            changed |= ui
+                .checkbox(
+                    &mut p.use_ergo_multiplier,
+                    "scale repetition by job ergonomics",
+                )
+                .on_hover_text(
+                    "On: repeating a physically hard job is penalised more than \
+                     repeating an easy one (× E_max - E_j + 1). Off: γ is a pure \
+                     boredom penalty, as in Happiness-first.",
+                )
+                .changed();
             if changed {
                 app.outcome = None;
             }
@@ -235,14 +361,18 @@ fn weights(app: &mut EjasApp, ui: &mut egui::Ui) {
     }
 }
 
-fn rows(p: &ejas_core::api::SolverParams) -> [(&'static str, u32); 6] {
+fn rows(p: &ejas_core::api::SolverParams) -> [(&'static str, String); 7] {
     [
-        ("offset", p.offset),
-        ("ω  preference", p.omega),
-        ("α  leader", p.alpha),
-        ("β  external", p.beta),
-        ("τ  history days", p.tau),
-        ("γ  repetition", p.gamma),
+        ("offset", p.offset.to_string()),
+        ("ω  preference", p.omega.to_string()),
+        ("α  leader", p.alpha.to_string()),
+        ("β  external", p.beta.to_string()),
+        ("τ  history days", p.tau.to_string()),
+        ("γ  repetition", p.gamma.to_string()),
+        (
+            "ergonomic multiplier",
+            if p.use_ergo_multiplier { "on" } else { "off" }.to_owned(),
+        ),
     ]
 }
 

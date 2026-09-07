@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use ejas_core::api::{SolverParams, WeightPreset};
+use ejas_core::api::{PresetInputs, SolverParams, StationDims, WeightPreset};
 use ejas_core::structs::{Day, Station};
 
 /// Which screen the user is on.
@@ -74,30 +74,41 @@ pub struct Weights {
     /// Live values when `mode` is `Manual`. Seeded from the last preset used,
     /// so tuning starts from a working baseline rather than from zero.
     pub manual: SolverParams,
+    /// `d_limit`, `K` and `tau`, which the preset formulas need but which are
+    /// policy rather than weights. Editable so a station that rotates every
+    /// day is not stuck with a preset built for rotating every second day.
+    pub inputs: PresetInputs,
 }
 
 impl Default for Weights {
     fn default() -> Self {
         Self {
             mode: WeightMode::Preset(WeightPreset::Balanced),
-            manual: WeightPreset::Balanced.params(),
+            // Nominal until a station is loaded; `params` re-derives from the
+            // real one on every call, so this is never what gets sent.
+            manual: SolverParams::default(),
+            inputs: PresetInputs::default(),
         }
     }
 }
 
 impl Weights {
     /// The params that will actually be sent.
-    pub fn params(&self) -> SolverParams {
+    ///
+    /// Presets are derived from the station, so this needs the roster: the
+    /// thresholds are all statements about outweighing another term of the
+    /// objective, and those terms scale with N, M and the ergonomic spread.
+    pub fn params(&self, station: &Station) -> SolverParams {
         match self.mode {
-            WeightMode::Preset(p) => p.params(),
+            WeightMode::Preset(p) => p.params(StationDims::of(station), self.inputs),
             WeightMode::Manual => self.manual,
         }
     }
 
     /// Switch to manual, carrying the currently-shown numbers over.
-    pub fn switch_to_manual(&mut self) {
+    pub fn switch_to_manual(&mut self, station: &Station) {
         if self.mode != WeightMode::Manual {
-            self.manual = self.params();
+            self.manual = self.params(station);
             self.mode = WeightMode::Manual;
         }
     }

@@ -86,7 +86,9 @@ impl EjasApp {
         self.problem.station_id = station_id;
         self.problem.station = station;
         self.daily.reconcile(&self.problem.station);
-        // Default today's leader to whoever holds the role on the roster.
+        // A loaded matrix file may still carry a TeamLeader role; treat it as a
+        // starting suggestion for today, not as the answer. The Today tab owns
+        // the real choice from here on.
         if self.daily.team_leader.is_none() {
             self.daily.team_leader = self
                 .problem
@@ -101,7 +103,14 @@ impl EjasApp {
 
     /// Everything that currently blocks solving.
     pub fn blocking_problems(&self) -> Vec<String> {
-        validate::validate_station(&self.problem.station)
+        let mut problems = validate::validate_station(&self.problem.station);
+        // Today's leader is not part of the roster, so it needs its own check
+        // or the solve button would enable with nobody leading.
+        problems.extend(validate::validate_leader(
+            &self.problem.station,
+            self.daily.team_leader.as_deref(),
+        ));
+        problems
             .iter()
             .filter(|p| p.is_error())
             .map(|p| p.message().to_owned())
@@ -122,7 +131,7 @@ impl EjasApp {
         SolveRequest {
             station: self.problem.station.clone(),
             history: self.problem.history.clone(),
-            params: self.weights.params(),
+            params: self.weights.params(&self.problem.station),
             leader: self.daily.team_leader.clone(),
             forced_assignments: forced,
             loaned: buckets.loaned,

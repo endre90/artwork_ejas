@@ -24,16 +24,102 @@ pub struct SolverParams {
     pub tau: u32,
     /// gamma - how strongly to penalise repeating a recent employee-job pair.
     pub gamma: u32,
+    /// Whether the historical penalty is scaled per job by the ergonomic
+    /// multiplier `E_max - E_j + 1`, which makes repeating a physically hard
+    /// job hurt more than repeating an easy one. The Happiness-first strategy
+    /// drops it, leaving `gamma` as a pure boredom penalty on repetition.
+    #[serde(default = "yes")]
+    pub use_ergo_multiplier: bool,
     /// Wall-clock budget for the solver. `None` means the server default.
     pub timeout_ms: Option<u32>,
 }
 
-/// The default weights, matching what the original desktop GUI hardcoded.
+fn yes() -> bool {
+    true
+}
+
 pub const DEFAULT_TIMEOUT_MS: u32 = 30_000;
 
+/// Safety-first anchors the ergonomic penalty at `gamma = 1` and drops
+/// preferences to `omega = 0.01`. The weights are integers, so that ratio is
+/// expressed by scaling the whole objective by this factor - which leaves the
+/// argmax untouched, since scaling every term scales the objective uniformly.
+pub const PREFERENCE_SCALE: u32 = 100;
+
 impl Default for SolverParams {
+    /// Only reached when a client omits `params` entirely; the UI always
+    /// derives weights from the station actually being solved. The nominal
+    /// dimensions below are a placeholder, not a recommendation.
     fn default() -> Self {
-        WeightPreset::Balanced.params()
+        WeightPreset::Balanced.params(StationDims::NOMINAL, PresetInputs::default())
+    }
+}
+
+/// The station dimensions the strategy formulas are written in terms of.
+///
+/// `n` and `m` bound the largest preference reward the solver can reach
+/// (`omega * m * n`, every operator on their first choice), and the ergonomic
+/// scores bound the largest historical penalty it can reach.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StationDims {
+    /// `N` - operators in the station, the team leader included.
+    pub n: u32,
+    /// `M` - jobs in the station.
+    pub m: u32,
+    /// `E_min` - worst ergonomic score in the station.
+    pub e_min: u32,
+    /// `E_max` - best ergonomic score in the station.
+    pub e_max: u32,
+}
+
+impl StationDims {
+    /// Stand-in dimensions for [`SolverParams::default`].
+    pub const NOMINAL: Self = Self {
+        n: 12,
+        m: 8,
+        e_min: 1,
+        e_max: 5,
+    };
+
+    /// Read the dimensions off a station. Jobs are the `ergo_score` keys, the
+    /// same way the solver derives them.
+    ///
+    /// Every field is floored at 1: a station with no jobs, nobody in it, or a
+    /// zero ergonomic score would otherwise divide by zero below.
+    pub fn of(station: &Station) -> Self {
+        let scores = || station.ergo_score.values().map(|e| u32::from(*e));
+        Self {
+            n: (station.people.len() as u32).max(1),
+            m: (station.ergo_score.len() as u32).max(1),
+            e_min: scores().min().unwrap_or(1).max(1),
+            e_max: scores().max().unwrap_or(1).max(1),
+        }
+    }
+}
+
+/// The policy choices that feed the strategy formulas but are not weights
+/// themselves.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PresetInputs {
+    /// `d_limit` - consecutive days on one job after which rotating off it is
+    /// mandatory rather than merely preferred.
+    pub d_limit: u32,
+    /// `K` - how many times more undesirable an external operator is than
+    /// putting the team leader on a job. Fixes `beta = K * alpha`.
+    pub k: u32,
+    /// `tau` - days of history the fairness term looks back over. Safety-first
+    /// sizes `alpha` from it, since the ergonomic penalty it must outweigh
+    /// accumulates over the whole window.
+    pub tau: u32,
+}
+
+impl Default for PresetInputs {
+    fn default() -> Self {
+        Self {
+            d_limit: 2,
+            k: 2,
+            tau: 8,
+        }
     }
 }
 
@@ -42,43 +128,116 @@ impl Default for SolverParams {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum WeightPreset {
     Balanced,
-    PreferenceFirst,
-    FairnessFirst,
+    SafetyFirst,
+    HappinessFirst,
 }
 
 impl WeightPreset {
     pub const ALL: [WeightPreset; 3] = [
         WeightPreset::Balanced,
-        WeightPreset::PreferenceFirst,
-        WeightPreset::FairnessFirst,
+        WeightPreset::SafetyFirst,
+        WeightPreset::HappinessFirst,
     ];
 
     /// The single source of truth for preset weights.
     ///
-    /// `Balanced` reproduces the values the original GUI hardcoded, so
-    /// historic results stay comparable. Each other preset changes exactly
-    /// one weight, and each was checked against the bundled VCE and GTO data
-    /// to confirm it actually moves the assignment:
+    /// The weights are *derived* from the station rather than hardcoded,
+    /// because every threshold below is a statement about outweighing some
+    /// other term of the objective, and those terms scale with the station's
+    /// size and ergonomic spread. A constant that dominates preferences in an
+    /// 8-job station is a rounding error in a 40-job one.
     ///
-    /// - `omega` 1 -> 8 raises VCE's preference reward from 85 to 96.
-    /// - `gamma` 24 -> 96 drops GTO's repeat count from 2 to 0.
+    /// Three strategies, each anchoring a different term at 1:
     ///
-    /// `tau` deliberately stays at 8 everywhere: widening the window counts
-    /// more history and so *raises* the repeat count rather than lowering it,
-    /// which reads as the preset doing the opposite of what it claims.
-    pub fn params(self) -> SolverParams {
-        let (omega, alpha, beta, tau, gamma) = match self {
-            WeightPreset::Balanced => (1, 192, 384, 8, 24),
-            WeightPreset::PreferenceFirst => (8, 192, 384, 8, 24),
-            WeightPreset::FairnessFirst => (1, 192, 384, 8, 96),
+    /// **Balanced** negotiates between stated preferences and compounding
+    /// fatigue. Preferences are the anchor (`omega = 1`). To mandate rotation
+    /// off a job after `d_limit` consecutive days, the ergonomic penalty must
+    /// exceed the largest preference swing available:
+    ///
+    /// ```text
+    /// gamma > omega * M * N / (d_limit * E_min)
+    /// alpha > N * M * omega          beta = K * alpha
+    /// ```
+    ///
+    /// **Safety-first** anchors the ergonomic penalty (`gamma = 1`) and
+    /// reduces preferences to tie-breakers between equally safe assignments
+    /// (`omega = 0.01`, applied as [`PREFERENCE_SCALE`]). The leader and
+    /// external penalties must now clear the largest ergonomic penalty the
+    /// station can accumulate over the whole history window:
+    ///
+    /// ```text
+    /// alpha > N * tau * E_max        beta = K * alpha
+    /// ```
+    ///
+    /// **Happiness-first** suits stations whose jobs are physically alike. It
+    /// drops the ergonomic multiplier from the objective entirely, so `gamma`
+    /// becomes a pure boredom penalty that still has to outgrow the reward for
+    /// repeating a favourite job. `alpha` and `beta` are Balanced's:
+    ///
+    /// ```text
+    /// gamma > omega * M * N / (d_limit * E_max)
+    /// ```
+    ///
+    /// One caveat, kept faithful to the specification rather than silently
+    /// "fixed": Happiness-first divides by `E_max` where Balanced divides by
+    /// `E_min`. Since dropping the multiplier shrinks the historical penalty,
+    /// a rotation guarantee on its own would call for a *larger* `gamma` here,
+    /// not a smaller one - the two coincide only when `E_min == E_max`. The
+    /// formulas are implemented as written; if the intent was to swap those
+    /// two denominators, this is the line to change.
+    pub fn params(self, dims: StationDims, inputs: PresetInputs) -> SolverParams {
+        let (n, m) = (u64::from(dims.n), u64::from(dims.m));
+        let (e_min, e_max) = (u64::from(dims.e_min), u64::from(dims.e_max));
+        let d_limit = u64::from(inputs.d_limit.max(1));
+        let tau = u64::from(inputs.tau.max(1));
+        let k = u64::from(inputs.k);
+        let scale = u64::from(PREFERENCE_SCALE);
+
+        // The formulas are strict inequalities. The smallest integer strictly
+        // above a quotient is that quotient floored, plus one.
+        let above = |numerator: u64, denominator: u64| numerator / denominator.max(1) + 1;
+
+        let (omega, alpha, gamma, use_ergo_multiplier) = match self {
+            WeightPreset::Balanced => {
+                let omega = 1;
+                let alpha = above(n * m * omega, 1);
+                (omega, alpha, above(omega * m * n, d_limit * e_min), true)
+            }
+            WeightPreset::SafetyFirst => {
+                // omega = 0.01 and gamma = 1, both multiplied through by the
+                // scale factor to stay in integers.
+                let alpha = above(scale * n * tau * e_max, 1);
+                (1, alpha, scale, true)
+            }
+            WeightPreset::HappinessFirst => {
+                let omega = 1;
+                let alpha = above(n * m * omega, 1);
+                (omega, alpha, above(omega * m * n, d_limit * e_max), false)
+            }
         };
+        let beta = alpha.saturating_mul(k);
+
+        // Keep the reported score positive: bound every penalty the solver can
+        // incur. The leader and externals are capped by the job count, and the
+        // historical term by a full window on the worst-ergonomics job.
+        let worst_multiplier = if use_ergo_multiplier {
+            e_max - e_min + 1
+        } else {
+            1
+        };
+        let offset = alpha
+            .saturating_mul(m)
+            .saturating_add(beta.saturating_mul(m))
+            .saturating_add(gamma.saturating_mul(n * tau * worst_multiplier));
+
         SolverParams {
-            offset: 2000,
-            omega,
-            alpha,
-            beta,
-            tau,
-            gamma,
+            offset: fits(offset),
+            omega: fits(omega),
+            alpha: fits(alpha),
+            beta: fits(beta),
+            tau: inputs.tau,
+            gamma: fits(gamma),
+            use_ergo_multiplier,
             timeout_ms: Some(DEFAULT_TIMEOUT_MS),
         }
     }
@@ -86,26 +245,38 @@ impl WeightPreset {
     pub fn label(self) -> &'static str {
         match self {
             WeightPreset::Balanced => "Balanced",
-            WeightPreset::PreferenceFirst => "Preference-first",
-            WeightPreset::FairnessFirst => "Fairness-first",
+            WeightPreset::SafetyFirst => "Safety-first",
+            WeightPreset::HappinessFirst => "Happiness-first",
         }
     }
 
     pub fn description(self) -> &'static str {
         match self {
             WeightPreset::Balanced => {
-                "Default trade-off between preferences, fairness and external operators."
+                "Negotiates between stated preferences and compounding physical \
+                 fatigue. Preferences are the anchor, and the ergonomic penalty \
+                 is sized to force a rotation after d_limit consecutive days on \
+                 the same job."
             }
-            WeightPreset::PreferenceFirst => {
-                "Weights stated preferences eight times higher, accepting a few \
-                 repeats to give people the jobs they asked for."
+            WeightPreset::SafetyFirst => {
+                "Minimises physical strain: the ergonomic penalty becomes the \
+                 anchor and preferences drop to tie-breakers between assignments \
+                 that are equally safe."
             }
-            WeightPreset::FairnessFirst => {
-                "Penalises repeating a recent person-job pairing four times harder, \
-                 even if that means putting the team leader on a job."
+            WeightPreset::HappinessFirst => {
+                "For stations whose jobs are physically alike. Drops the \
+                 ergonomic multiplier entirely, leaving a pure boredom penalty \
+                 that still rotates people off a favourite job."
             }
         }
     }
+}
+
+/// Saturate rather than wrap: the weights are only ever compared against each
+/// other, so a pathological station is better served by a clamped weight than
+/// by one that has silently wrapped around to nearly zero.
+fn fits(value: u64) -> u32 {
+    value.min(u64::from(u32::MAX)) as u32
 }
 
 /// Everything the server needs for one solve. The server keeps no state
@@ -117,6 +288,10 @@ pub struct SolveRequest {
     pub history: Vec<Day>,
     #[serde(default)]
     pub params: SolverParams,
+    /// Today's team leader, and the authority on who leads: the roster's own
+    /// `Role` values are a stale default that the server overwrites from this
+    /// before solving. `None` means nobody leads, and is rejected by
+    /// [`crate::validate::validate_leader`].
     #[serde(default)]
     pub leader: Option<String>,
     #[serde(default)]

@@ -37,9 +37,15 @@ pub async fn solve(
     Ok(Json(response))
 }
 
-fn run(request: SolveRequest) -> SolveResponse {
+fn run(mut request: SolveRequest) -> SolveResponse {
     let params = request.params;
     let timeout = params.timeout_ms.or(Some(DEFAULT_TIMEOUT_MS));
+
+    // Who leads changes from day to day, so the request is authoritative and
+    // the roster's own roles are only a stale default. The solver reads the
+    // role off the station, so stamp today's choice onto it before solving -
+    // without this, `leader` travels with every request and is then ignored.
+    request.station.set_todays_leader(request.leader.as_deref());
 
     let solution = calculate_ergonomic_assignment_with_timeout(
         &request.station,
@@ -50,6 +56,7 @@ fn run(request: SolveRequest) -> SolveResponse {
         params.beta,
         params.tau,
         params.gamma,
+        params.use_ergo_multiplier,
         &request.forced_assignments,
         &request.loaned,
         &request.absent,
@@ -86,4 +93,77 @@ pub struct ErrorBody {
 
 fn bad_request(message: String) -> (StatusCode, Json<ErrorBody>) {
     (StatusCode::BAD_REQUEST, Json(ErrorBody { error: message }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ejas_core::api::{PresetInputs, SolverParams, StationDims, WeightPreset};
+    use ejas_core::structs::{Matrix, Role};
+
+    fn gto_request(leader: Option<&str>) -> SolveRequest {
+        let path = format!(
+            "{}/../../data/factory/GTO_matrix.json",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        let text = std::fs::read_to_string(path).expect("matrix file");
+        let matrix: Matrix = serde_json::from_str(&text).expect("matrix parses");
+        let station = matrix.stations["GTO"].clone();
+        let params =
+            WeightPreset::SafetyFirst.params(StationDims::of(&station), PresetInputs::default());
+        SolveRequest {
+            station,
+            history: Vec::new(),
+            params: SolverParams {
+                timeout_ms: Some(10_000),
+                ..params
+            },
+            leader: leader.map(str::to_owned),
+            forced_assignments: Vec::new(),
+            loaned: Vec::new(),
+            absent: Vec::new(),
+            training: Vec::new(),
+            supervision: Vec::new(),
+        }
+    }
+
+    /// The handler must apply `leader` before solving. It previously did not:
+    /// the field travelled with every request and the solver went on reading
+    /// the role off the roster, so the Today tab's choice did nothing.
+    #[test]
+    fn run_honours_todays_leader_over_the_roster() {
+        let request = gto_request(None);
+        let from_file = request
+            .station
+            .people
+            .iter()
+            .find(|e| e.role == Role::TeamLeader)
+            .expect("GTO designates a leader")
+            .name
+            .clone();
+        let someone_else = request
+            .station
+            .people
+            .iter()
+            .map(|e| e.name.clone())
+            .find(|n| *n != from_file)
+            .expect("another operator");
+
+        let response = run(gto_request(Some(&someone_else)));
+        let assigned: Vec<&str> = response
+            .internal_assignments
+            .iter()
+            .map(|(name, _)| name.as_str())
+            .collect();
+
+        assert!(
+            !assigned.contains(&someone_else.as_str()),
+            "'{someone_else}' was named leader but still got work: {assigned:?}"
+        );
+        assert!(
+            assigned.contains(&from_file.as_str()),
+            "'{from_file}' only leads according to the file and should be free \
+             to work: {assigned:?}"
+        );
+    }
 }

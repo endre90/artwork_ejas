@@ -173,6 +173,8 @@ fn employee_row(
     remove: &mut Option<usize>,
 ) {
     let mut dirty = false;
+    let leads_today =
+        app.daily.team_leader.as_deref() == Some(app.problem.station.people[index].name.as_str());
     let person = &mut app.problem.station.people[index];
 
     ui.horizontal(|ui| {
@@ -182,19 +184,12 @@ fn employee_row(
                 .font(egui::TextStyle::Heading),
         );
 
-        egui::ComboBox::from_id_salt(("role", index))
-            .selected_text(match person.role {
-                Role::TeamLeader => "Team leader",
-                Role::Operator => "Operator",
-            })
-            .show_ui(ui, |ui| {
-                dirty |= ui
-                    .selectable_value(&mut person.role, Role::Operator, "Operator")
-                    .changed();
-                dirty |= ui
-                    .selectable_value(&mut person.role, Role::TeamLeader, "Team leader")
-                    .changed();
-            });
+        // No role picker: who leads is a daily decision, made on the Today
+        // tab, so the roster only says who works here and what they can do.
+        if leads_today {
+            ui.label(egui::RichText::new("team leader today").weak().italics())
+                .on_hover_text("Set on the Today tab.");
+        }
 
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if ui.small_button("✖").on_hover_text("Remove employee").clicked() {

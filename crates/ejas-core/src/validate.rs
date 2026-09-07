@@ -4,7 +4,7 @@
 //! server runs them again because it cannot trust its client.
 
 use crate::api::SolveRequest;
-use crate::structs::{Role, Station};
+use crate::structs::Station;
 
 /// A single reason a roster or request cannot be solved.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -28,6 +28,10 @@ impl Problem {
 }
 
 /// Check a station is well-formed enough to solve.
+///
+/// Deliberately says nothing about the team leader: who leads changes from day
+/// to day, so it is a property of the request rather than of the roster. See
+/// [`validate_leader`].
 pub fn validate_station(station: &Station) -> Vec<Problem> {
     let mut problems = Vec::new();
 
@@ -36,23 +40,6 @@ pub fn validate_station(station: &Station) -> Vec<Problem> {
     }
     if station.people.is_empty() {
         problems.push(Problem::Error("Add at least one employee.".into()));
-    }
-
-    let leaders: Vec<&str> = station
-        .people
-        .iter()
-        .filter(|e| e.role == Role::TeamLeader)
-        .map(|e| e.name.as_str())
-        .collect();
-    match leaders.len() {
-        1 => {}
-        0 => problems.push(Problem::Error(
-            "Exactly one employee must have the TeamLeader role; none do.".into(),
-        )),
-        n => problems.push(Problem::Error(format!(
-            "Exactly one employee must have the TeamLeader role; {n} do ({}).",
-            leaders.join(", ")
-        ))),
     }
 
     let mut seen: Vec<&str> = Vec::new();
@@ -96,9 +83,27 @@ pub fn validate_station(station: &Station) -> Vec<Problem> {
     problems
 }
 
+/// Check today's team leader against the roster.
+///
+/// Separate from [`validate_request`] so the UI can call it every frame to
+/// enable or disable the solve button, without cloning the roster and the
+/// whole history to assemble a request first.
+pub fn validate_leader(station: &Station, leader: Option<&str>) -> Vec<Problem> {
+    match leader.map(str::trim) {
+        None | Some("") => vec![Problem::Error("Choose today's team leader.".into())],
+        Some(name) if !station.people.iter().any(|e| e.name == name) => {
+            vec![Problem::Error(format!(
+                "'{name}' is set as today's team leader but is not on this station's roster."
+            ))]
+        }
+        Some(_) => Vec::new(),
+    }
+}
+
 /// Check a whole request, including the parts that depend on history.
 pub fn validate_request(request: &SolveRequest) -> Vec<Problem> {
     let mut problems = validate_station(&request.station);
+    problems.extend(validate_leader(&request.station, request.leader.as_deref()));
 
     let names: Vec<&str> = request
         .station

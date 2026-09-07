@@ -61,6 +61,9 @@ pub fn calculate_ergonomic_assignment(
         beta,
         tau,
         gamma,
+        // The evaluation harnesses predate the Happiness-first strategy and
+        // were all measured with the ergonomic multiplier applied.
+        true,
         forced_assignments,
         loaned_employees,
         absent_employees,
@@ -84,6 +87,9 @@ pub fn calculate_ergonomic_assignment_with_timeout(
     beta: u32,   // How strongly to discourage external operator usage
     tau: u32,    // Number of days to consider in the historical data (from tau to today)
     gamma: u32, // how strongly to penalize assigning the same employee–job pair that was frequently assigned in the past tau days
+    // Whether to scale the historical penalty per job by `E_max - E_j + 1`.
+    // False leaves gamma a pure repetition penalty, indifferent to ergonomics.
+    use_ergo_multiplier: bool,
     // delta: u32, // Ergonomics weight
     // theta: u32, // Weight controlling how the historical count reduces the ergonomics benefit of a job for a given employee.
     forced_assignments: &[(String, String)],
@@ -441,8 +447,15 @@ pub fn calculate_ergonomic_assignment_with_timeout(
             let hist_count = h_matrix[i][j] as i64;
             let e_j = station.ergo_score.get(&jobs[j]).unwrap_or(&1).to_owned() as i64;
 
-            // Invert the ergo score so bad ergonomics multiply the penalty more heavily
-            let ergo_multiplier = max_ergo - e_j + 1;
+            // Invert the ergo score so bad ergonomics multiply the penalty more
+            // heavily. Dropped entirely by the Happiness-first strategy, which
+            // assumes the jobs are physically alike and penalises repetition
+            // for its own sake.
+            let ergo_multiplier = if use_ergo_multiplier {
+                max_ergo - e_j + 1
+            } else {
+                1
+            };
 
             // Calculate the final static penalty integer in Rust
             let penalty_val = hist_count * ergo_multiplier;
